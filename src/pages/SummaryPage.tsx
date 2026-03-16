@@ -360,32 +360,26 @@ export default function SummaryPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
           {funcionesProximas.map((funcion) => {
-            const funcionAlertas = alertas.filter(a => a.mensaje.toLowerCase().includes(funcion.nombre.toLowerCase()));
+            const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(funcion.nombre.toLowerCase()));
             return (
-              <div key={funcion.id} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
+              <div key={funcion.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 hover:border-gray-200'}`}>
                 {funcion.image_url ? (
-                  <img src={funcion.image_url} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  <img src={funcion.image_url} alt="" className="w-11 h-11 rounded-lg object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
                     <span className="text-gray-400">🎭</span>
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {hasAlert && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
                     <p className="font-semibold text-gray-900 text-sm truncate">{funcion.nombre}</p>
-                    <span className={`text-xs font-bold flex-shrink-0 ${funcion.ocupacion >= 80 ? 'text-red-500' : funcion.ocupacion >= 50 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                      {funcion.ocupacion}%
-                    </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">{funcion.hora} · {funcion.sala}</p>
-                  {funcionAlertas.length > 0 && (
-                    <div className="mt-1.5">
-                      {funcionAlertas.slice(0, 2).map((a, i) => (
-                        <p key={i} className="text-[10px] text-red-500 truncate">⚠ {a.mensaje.split(': ').pop()}</p>
-                      ))}
-                    </div>
-                  )}
                 </div>
+                <span className={`text-sm font-bold flex-shrink-0 ${funcion.ocupacion >= 80 ? 'text-red-500' : funcion.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {funcion.ocupacion}%
+                </span>
               </div>
             );
           })}
