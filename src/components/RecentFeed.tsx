@@ -25,7 +25,7 @@ function getDotColor(type: FeedItemType): string {
     case 'coupon':
       return 'bg-purple-500';
     default:
-      return 'bg-[#f8f6f6]0';
+      return 'bg-gray-500';
   }
 }
 

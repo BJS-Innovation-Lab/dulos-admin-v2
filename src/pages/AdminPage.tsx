@@ -127,7 +127,7 @@ function RolesTab() {
           {expanded === rol.nombre && (
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
               {Object.entries(permisosDetalle[rol.nombre] || {}).map(([cat, perms]) => (
-                <div key={cat} className="bg-gray-50 rounded-lg p-3">
+                <div key={cat} className="bg-[#f8f6f6] rounded-lg p-3">
                   <p className="font-medium text-sm mb-1" style={{ color: ACCENT }}>{cat}</p>
                   {perms.map((p) => <span key={p} className="block text-xs text-gray-600">{p}</span>)}
                 </div>

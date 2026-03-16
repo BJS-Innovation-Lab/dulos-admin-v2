@@ -74,7 +74,7 @@ function getActividadColor(tipo: string): string {
     case 'cancelacion':
       return 'bg-red-500';
     default:
-      return 'bg-[#f8f6f6]0';
+      return 'bg-gray-500';
   }
 }
 

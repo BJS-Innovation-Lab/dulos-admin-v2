@@ -122,7 +122,7 @@ const getStatusColor = (status: Project['status']) => {
     case 'PUBLICADO':
       return 'bg-green-500';
     case 'BORRADOR':
-      return 'bg-[#f8f6f6]0';
+      return 'bg-gray-500';
     case 'ARCHIVADO':
       return 'bg-red-500';
   }
