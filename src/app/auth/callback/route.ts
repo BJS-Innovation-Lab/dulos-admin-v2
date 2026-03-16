@@ -7,12 +7,10 @@ export async function GET(request: NextRequest) {
   const origin = requestUrl.origin;
 
   if (!code) {
-    // No code = might be hash fragment flow, let client page.tsx handle it
-    // Redirect to login where onAuthStateChange will pick it up
+    // No code = hash fragment flow, redirect to login so client handles it
     return NextResponse.redirect(`${origin}/login`);
   }
 
-  // Create redirect response FIRST so we can set cookies on it
   const response = NextResponse.redirect(`${origin}/`);
 
   const supabase = createServerClient(
@@ -21,11 +19,9 @@ export async function GET(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          // Read from the incoming request
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          // Write directly to the redirect response
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -45,6 +41,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=acceso_denegado`);
   }
 
-  // Return redirect response WITH session cookies attached
   return response;
 }
