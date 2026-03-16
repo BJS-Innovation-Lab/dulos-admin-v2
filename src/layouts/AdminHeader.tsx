@@ -13,10 +13,9 @@ export default function AdminHeader({ user, onLogout }: AdminHeaderProps) {
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-[1400px] mx-auto px-8 h-24 flex items-center justify-center relative">
-        {/* Centered Logo + Brand Name (Cellosa-style) */}
-        <div className="flex items-center gap-4">
+        {/* Centered Logo */}
+        <div className="flex items-center">
           <Image src="/dulos-logo.svg" alt="Dulos" width={56} height={56} className="h-14 w-14" priority />
-          <span className="text-2xl font-bold tracking-tight text-[#E63946]">DULOS ADMIN</span>
         </div>
 
         {/* Right side: Salir button (Cellosa-style) */}
