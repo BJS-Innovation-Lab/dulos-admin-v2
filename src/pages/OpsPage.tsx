@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 const ACCENT = '#E63946'
 const tabs = ['Scanner', 'Historial', 'Cupones'] as const
@@ -39,12 +39,62 @@ export default function OpsPage() {
   const [filtroEvento, setFiltroEvento] = useState('')
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [checkInCount, setCheckInCount] = useState(234)
+  const [cameraActive, setCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setCameraActive(false)
+  }, [])
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Tu navegador no soporta acceso a la cámara')
+        return
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+      setCameraActive(true)
+    } catch (err) {
+      const error = err as Error
+      let errorMsg: string
+      if (error.name === 'NotAllowedError') {
+        errorMsg = 'Permiso de cámara denegado. Por favor habilita el acceso en tu navegador.'
+      } else if (error.name === 'NotFoundError') {
+        errorMsg = 'No se encontró ninguna cámara en este dispositivo.'
+      } else {
+        errorMsg = 'No se pudo acceder a la cámara: ' + error.message
+      }
+      alert(errorMsg)
+    }
+  }, [])
 
   useEffect(() => {
     if (activeTab !== 'Scanner') return
     const interval = setInterval(() => setCheckInCount(c => Math.min(c + 1, 1200)), 5000)
     return () => clearInterval(interval)
   }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'Scanner') {
+      stopCamera()
+    }
+  }, [activeTab, stopCamera])
 
   const historialFiltrado = historial.filter(h => {
     const matchEvento = !filtroEvento || h.evento === filtroEvento
@@ -90,24 +140,36 @@ export default function OpsPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gray-900 rounded-xl aspect-video flex flex-col items-center justify-center gap-4 p-6">
-              <span className="text-6xl">📷</span>
-              <p className="text-white text-lg">QR Scanner</p>
-              <p className="text-gray-400 text-sm text-center">Apunta al código QR del boleto</p>
-              <button
-                onClick={() => {
-                  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ video: true })
-                      .then(() => alert('Cámara activada'))
-                      .catch(() => alert('No se pudo acceder a la cámara'));
-                  } else {
-                    alert('Tu navegador no soporta acceso a la cámara');
-                  }
-                }}
-                className="px-4 py-2 text-[#E63946] border-b-[3px] border-[#E63946] font-medium hover:bg-[#c5303c] transition-colors"
-              >
-                Activar Cámara
-              </button>
+            <div className="bg-gray-900 rounded-xl aspect-video flex flex-col items-center justify-center gap-4 p-6 relative overflow-hidden">
+              {cameraActive ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full rounded-xl bg-black aspect-video object-cover"
+                  />
+                  <button
+                    onClick={stopCamera}
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-[#E63946] text-white rounded-lg font-medium hover:bg-[#c5303c] transition-colors cursor-pointer"
+                  >
+                    Detener
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-6xl">📷</span>
+                  <p className="text-white text-lg">QR Scanner</p>
+                  <p className="text-gray-400 text-sm text-center">Apunta al código QR del boleto</p>
+                  <button
+                    onClick={startCamera}
+                    className="px-4 py-2 bg-[#E63946] text-white rounded-lg font-medium hover:bg-[#c5303c] transition-colors cursor-pointer"
+                  >
+                    Iniciar Cámara
+                  </button>
+                </>
+              )}
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Check-ins Recientes</h3>
