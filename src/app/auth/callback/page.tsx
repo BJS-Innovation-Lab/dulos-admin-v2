@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -18,14 +18,12 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // Create Supabase client with proper cookie handling
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
       try {
-        // Exchange the code for a session (this handles PKCE verification)
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (exchangeError) {
@@ -41,7 +39,6 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        // Check if the email is authorized
         const email = data.session.user.email.toLowerCase();
         if (email !== "angel.lopez@vulkn-ai.com") {
           console.log("Unauthorized email:", email);
@@ -50,7 +47,6 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        // Success - redirect to home
         console.log("Auth successful for:", email);
         router.replace("/");
       } catch (err) {
@@ -78,5 +74,19 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <div className="text-gray-500 text-sm">Iniciando sesión...</div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+          <div className="text-gray-500 text-sm">Iniciando sesión...</div>
+        </div>
+      }
+    >
+      <AuthCallbackInner />
+    </Suspense>
   );
 }
