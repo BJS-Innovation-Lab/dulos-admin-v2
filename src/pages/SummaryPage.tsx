@@ -39,61 +39,32 @@ interface ClienteDisplay {
   boletos: number;
 }
 
-const mockMetrics = {
+const emptyMetrics = {
   revenue: {
     label: 'Ingresos del Mes',
-    value: '$1,245,890 MXN',
-    trend: { value: 12.5, isPositive: true },
-    sparkline: [65, 78, 52, 91, 83],
+    value: '$0 MXN',
+    trend: { value: 0, isPositive: true },
+    sparkline: [0, 0, 0, 0, 0],
   },
   tickets: {
     label: 'Boletos Vendidos',
-    value: '8,432',
-    trend: { value: 8.3, isPositive: true },
-    sparkline: [45, 62, 78, 55, 89],
+    value: '0',
+    trend: { value: 0, isPositive: true },
+    sparkline: [0, 0, 0, 0, 0],
   },
   occupancy: {
     label: 'Ocupación Promedio',
-    value: '76%',
-    trend: { value: 3.2, isPositive: false },
-    sparkline: [82, 75, 79, 71, 76],
+    value: '0%',
+    trend: { value: 0, isPositive: true },
+    sparkline: [0, 0, 0, 0, 0],
   },
   upcoming: {
     label: 'Funciones Próximas',
-    value: '24',
-    trend: { value: 15.0, isPositive: true },
-    sparkline: [18, 22, 19, 25, 24],
+    value: '0',
+    trend: { value: 0, isPositive: true },
+    sparkline: [0, 0, 0, 0, 0],
   },
 };
-
-const mockAlertas: Alerta[] = [
-  { id: 1, tipo: 'critico', mensaje: 'Función "Romeo y Julieta" 18:00 - Solo quedan 5 lugares disponibles' },
-  { id: 2, tipo: 'critico', mensaje: 'Error en terminal de pago #3 - Requiere atención inmediata' },
-  { id: 3, tipo: 'warning', mensaje: 'Stock bajo de boletos impresos para Sala Principal' },
-  { id: 4, tipo: 'info', mensaje: 'Reporte semanal listo para revisión' },
-];
-
-const mockFuncionesProximas = [
-  { id: 1, nombre: 'Romeo y Julieta', hora: '18:00', sala: 'Sala Principal', ocupacion: 95, available: 5, image_url: '' },
-  { id: 2, nombre: 'El Fantasma de la Ópera', hora: '19:30', sala: 'Sala A', ocupacion: 78, available: 22, image_url: '' },
-  { id: 3, nombre: 'Los Miserables', hora: '20:00', sala: 'Sala B', ocupacion: 45, available: 55, image_url: '' },
-  { id: 4, nombre: 'Cats', hora: '20:30', sala: 'Sala Principal', ocupacion: 62, available: 38, image_url: '' },
-  { id: 5, nombre: 'Chicago', hora: '21:00', sala: 'Sala C', ocupacion: 28, available: 72, image_url: '' },
-];
-
-const mockActividadReciente = [
-  { id: 1, tipo: 'venta', mensaje: 'Venta de 4 boletos - Romeo y Julieta', tiempo: 'Hace 2 min' },
-  { id: 2, tipo: 'reembolso', mensaje: 'Reembolso procesado - $450 MXN', tiempo: 'Hace 5 min' },
-  { id: 3, tipo: 'venta', mensaje: 'Venta de 2 boletos - El Fantasma de la Ópera', tiempo: 'Hace 8 min' },
-  { id: 4, tipo: 'reservacion', mensaje: 'Nueva reservación grupal - 15 personas', tiempo: 'Hace 12 min' },
-  { id: 5, tipo: 'venta', mensaje: 'Venta de 6 boletos - Los Miserables', tiempo: 'Hace 15 min' },
-];
-
-const mockClientes = [
-  { id: '1', nombre: 'María González Hernández', email: 'maria.gonzalez@gmail.com', ordenes: 12, gastado: 8450, boletos: 28 },
-  { id: '2', nombre: 'Carlos Ramírez López', email: 'carlos.ramirez@hotmail.com', ordenes: 8, gastado: 5200, boletos: 16 },
-  { id: '3', nombre: 'Ana Martínez Sánchez', email: 'ana.martinez@outlook.com', ordenes: 5, gastado: 3100, boletos: 10 },
-];
 
 function getOcupacionColor(ocupacion: number): string {
   if (ocupacion >= 80) return 'bg-red-500';
@@ -161,15 +132,25 @@ function SkeletonMetrics() {
   );
 }
 
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+      <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+      </svg>
+      <p className="text-sm">{message}</p>
+    </div>
+  );
+}
+
 export default function SummaryPage() {
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState(mockMetrics);
-  const [alertas, setAlertas] = useState<Alerta[]>(mockAlertas);
-  const [funcionesProximas, setFuncionesProximas] = useState(mockFuncionesProximas);
-  const [actividadReciente, setActividadReciente] = useState<Actividad[]>(
-    mockActividadReciente.map((a) => ({ ...a, id: String(a.id) }))
-  );
-  const [clientes, setClientes] = useState<ClienteDisplay[]>(mockClientes);
+  const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState(emptyMetrics);
+  const [alertas, setAlertas] = useState<Alerta[]>([]);
+  const [funcionesProximas, setFuncionesProximas] = useState<{ id: number; nombre: string; hora: string; sala: string; ocupacion: number; available: number; image_url: string }[]>([]);
+  const [actividadReciente, setActividadReciente] = useState<Actividad[]>([]);
+  const [clientes, setClientes] = useState<ClienteDisplay[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -183,7 +164,7 @@ export default function SummaryPage() {
           fetchEscalations(),
         ]);
 
-        // Calculate metrics - use zones for revenue since orders may be empty
+        // Calculate metrics from real data
         const totalRevenue = zones.reduce((sum, zone) => sum + (zone.sold * zone.price), 0);
         const totalTickets = zones.reduce((sum, zone) => sum + zone.sold, 0);
         const totalAvailable = zones.reduce((sum, zone) => sum + zone.available + zone.sold, 0);
@@ -194,30 +175,30 @@ export default function SummaryPage() {
           revenue: {
             label: 'Ingresos del Mes',
             value: `$${totalRevenue.toLocaleString()} MXN`,
-            trend: { value: 12.5, isPositive: true },
-            sparkline: [65, 78, 52, 91, 83],
+            trend: { value: 0, isPositive: true },
+            sparkline: [0, 0, 0, 0, totalRevenue > 0 ? 100 : 0],
           },
           tickets: {
             label: 'Boletos Vendidos',
             value: totalTickets.toLocaleString(),
-            trend: { value: 8.3, isPositive: true },
-            sparkline: [45, 62, 78, 55, 89],
+            trend: { value: 0, isPositive: true },
+            sparkline: [0, 0, 0, 0, totalTickets > 0 ? 100 : 0],
           },
           occupancy: {
             label: 'Ocupación Promedio',
             value: `${occupancy}%`,
-            trend: { value: 3.2, isPositive: occupancy >= 70 },
-            sparkline: [82, 75, 79, 71, occupancy],
+            trend: { value: 0, isPositive: occupancy >= 70 },
+            sparkline: [0, 0, 0, 0, occupancy],
           },
           upcoming: {
             label: 'Funciones Próximas',
             value: String(upcomingCount),
-            trend: { value: 15.0, isPositive: true },
-            sparkline: [18, 22, 19, 25, upcomingCount],
+            trend: { value: 0, isPositive: true },
+            sparkline: [0, 0, 0, 0, upcomingCount],
           },
         });
 
-        // Build alerts from zones with low availability
+        // Build alerts from real zone data
         const newAlertas: Alerta[] = [];
         const eventMap = new Map(events.map((e) => [e.id, e]));
 
@@ -227,8 +208,8 @@ export default function SummaryPage() {
             const eventName = event?.name || zone.event_id;
             newAlertas.push({
               id: `zone-${idx}`,
-              tipo: zone.available < 50 ? 'critico' : 'warning',
-              mensaje: `${eventName} - ${zone.zone_name}: Solo quedan ${zone.available} lugares disponibles`,
+              tipo: 'critico',
+              mensaje: `${eventName} - ${zone.zone_name}: Solo quedan ${zone.available} lugares`,
             });
           } else if (zone.available < 100) {
             const event = eventMap.get(zone.event_id);
@@ -241,7 +222,6 @@ export default function SummaryPage() {
           }
         });
 
-        // Add escalations as alerts
         escalations.forEach((esc, idx) => {
           newAlertas.push({
             id: `esc-${idx}`,
@@ -250,17 +230,14 @@ export default function SummaryPage() {
           });
         });
 
-        if (newAlertas.length > 0) {
-          setAlertas(newAlertas.slice(0, 6));
-        }
+        setAlertas(newAlertas.slice(0, 6));
 
-        // Build funciones próximas from events + zones
+        // Build funciones próximas from real events + zones
         const funcionesData = events.slice(0, 5).map((event, idx) => {
           const eventZones = zones.filter((z) => z.event_id === event.id);
           const sold = eventZones.reduce((s, z) => s + z.sold, 0);
           const total = eventZones.reduce((s, z) => s + z.available + z.sold, 0);
           const ocupacion = total > 0 ? Math.round((sold / total) * 100) : 0;
-
           const available = eventZones.reduce((s, z) => s + z.available, 0);
 
           return {
@@ -274,11 +251,9 @@ export default function SummaryPage() {
           };
         });
 
-        if (funcionesData.length > 0) {
-          setFuncionesProximas(funcionesData);
-        }
+        setFuncionesProximas(funcionesData);
 
-        // Build actividad reciente from checkins + orders
+        // Build actividad reciente from real checkins + orders
         const actividades: Actividad[] = [];
 
         checkins.slice(0, 5).forEach((checkin) => {
@@ -300,29 +275,23 @@ export default function SummaryPage() {
           });
         });
 
-        // Sort by time (most recent first) - approximated by order in arrays
-        if (actividades.length > 0) {
-          setActividadReciente(actividades.slice(0, 10));
-        }
+        setActividadReciente(actividades.slice(0, 10));
 
-        // Build clientes recientes
+        // Build clientes recientes from real data
         const clientesData: ClienteDisplay[] = customers.slice(0, 3).map((c) => ({
           id: c.id,
           nombre: c.name,
           email: c.email,
           ordenes: c.total_orders,
           gastado: c.total_spent,
-          boletos: c.total_orders * 2, // Estimate
+          boletos: c.total_orders * 2,
         }));
 
-        if (clientesData.length > 0) {
-          setClientes(clientesData);
-        }
-
+        setClientes(clientesData);
         setLoading(false);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        // Keep mock data as fallback
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+        setError('Error conectando con Supabase. Verifica tu conexión.');
         setLoading(false);
       }
     }
@@ -340,9 +309,21 @@ export default function SummaryPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-red-500">
+        <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+        <p className="text-sm font-medium">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-3 text-xs text-[#E63946] hover:underline">Reintentar</button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Hero Metrics - Cellosa style cards */}
+      {/* Hero Metrics - real data */}
       <HeroMetrics
         revenue={metrics.revenue}
         tickets={metrics.tickets}
@@ -350,7 +331,7 @@ export default function SummaryPage() {
         upcoming={metrics.upcoming}
       />
 
-      {/* Funciones Próximas + Alertas integradas */}
+      {/* Funciones Próximas + Alertas */}
       <div className="section-card">
         <div className="section-card-header !py-3">
           <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -361,84 +342,93 @@ export default function SummaryPage() {
             <span className="badge badge-error ml-auto">{alertas.filter(a => a.tipo === 'critico').length} alertas</span>
           )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
-          {funcionesProximas.map((funcion) => {
-            const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(funcion.nombre.toLowerCase()));
-            return (
-              <div key={funcion.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 hover:border-gray-200'}`}>
-                {funcion.image_url ? (
-                  <img src={funcion.image_url} alt="" className="w-11 h-11 rounded-lg object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <span className="text-gray-400">🎭</span>
+        {funcionesProximas.length === 0 ? (
+          <EmptyState message="No hay funciones próximas registradas" />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+            {funcionesProximas.map((funcion) => {
+              const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(funcion.nombre.toLowerCase()));
+              return (
+                <div key={funcion.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 hover:border-gray-200'}`}>
+                  {funcion.image_url ? (
+                    <img src={funcion.image_url} alt="" className="w-11 h-11 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-gray-400">🎭</span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {hasAlert && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                      <p className="font-semibold text-gray-900 text-sm truncate">{funcion.nombre}</p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{funcion.hora} · {funcion.sala}</p>
+                    <p className={`text-xs mt-1 font-medium ${funcion.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>
+                      {funcion.available} boletos disponibles
+                    </p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    {hasAlert && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
-                    <p className="font-semibold text-gray-900 text-sm truncate">{funcion.nombre}</p>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{funcion.hora} · {funcion.sala}</p>
-                  <p className={`text-xs mt-1 font-medium ${funcion.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>
-                    {funcion.available} boletos disponibles
-                  </p>
+                  <span className={`text-sm font-bold flex-shrink-0 ${funcion.ocupacion >= 80 ? 'text-red-500' : funcion.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-400'}`}>
+                    {funcion.ocupacion}%
+                  </span>
                 </div>
-                <span className={`text-sm font-bold flex-shrink-0 ${funcion.ocupacion >= 80 ? 'text-red-500' : funcion.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-400'}`}>
-                  {funcion.ocupacion}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Clientes + Actividad — full width side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Clientes Recientes — 2 cols */}
-        <div className="section-card flex flex-col lg:col-span-2">
+      {/* Clientes Recientes + Actividad Reciente */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Clientes Recientes */}
+        <div className="section-card flex flex-col">
           <div className="section-card-header !py-3">
-            <svg className="w-4 h-4" fill="none" stroke="#E63946" viewBox="0 0 24 24" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <span className="section-card-title">Clientes Recientes</span>
           </div>
-          <div className="flex-1 divide-y divide-gray-50">
-            {clientes.map((cliente) => (
-              <div key={cliente.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
-                <div className="w-8 h-8 rounded-full bg-[#E63946] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {cliente.nombre.charAt(0)}
+          {clientes.length === 0 ? (
+            <EmptyState message="Sin clientes registrados" />
+          ) : (
+            <div className="flex-1 divide-y divide-gray-50">
+              {clientes.map((cliente) => (
+                <div key={cliente.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-[#E63946] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    {cliente.nombre.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{cliente.nombre}</p>
+                    <p className="text-xs text-gray-500">{cliente.ordenes} órdenes · ${cliente.gastado.toLocaleString()}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 text-sm truncate">{cliente.nombre}</p>
-                  <p className="text-xs text-gray-400">{cliente.ordenes} órdenes · ${cliente.gastado.toLocaleString()} · {cliente.boletos} boletos</p>
-                </div>
-                <button onClick={() => alert(`Detalle de ${cliente.nombre}`)} className="text-[11px] text-[#E63946] hover:underline flex-shrink-0 font-medium">
-                  Ver →
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Actividad Reciente — 3 cols */}
-        <div className="section-card flex flex-col lg:col-span-3">
+        {/* Actividad Reciente */}
+        <div className="section-card flex flex-col lg:col-span-2">
           <div className="section-card-header !py-3">
-            <svg className="w-4 h-4" fill="none" stroke="#E63946" viewBox="0 0 24 24" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="section-card-title">Actividad Reciente</span>
           </div>
-          <div className="flex-1 divide-y divide-gray-50">
-            {actividadReciente.filter(a => !a.mensaje.includes('null')).map((actividad) => (
-              <div key={actividad.id} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors">
-                <span className="text-sm flex-shrink-0">{getActividadEmoji(actividad.tipo)}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700 truncate">{actividad.mensaje}</p>
+          {actividadReciente.length === 0 ? (
+            <EmptyState message="Sin actividad reciente" />
+          ) : (
+            <div className="flex-1 divide-y divide-gray-50">
+              {actividadReciente.map((actividad) => (
+                <div key={actividad.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                  <span className="text-sm flex-shrink-0">{getActividadEmoji(actividad.tipo)}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700 truncate">{actividad.mensaje}</p>
+                  </div>
+                  <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums">{actividad.tiempo}</span>
                 </div>
-                <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums">{actividad.tiempo}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
