@@ -3,6 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Dulos Admin",
+  icons: { icon: "/favicon.png", apple: "/favicon.png" },
   description: "Panel de Administración - Dulos Entertainment",
 };
 
