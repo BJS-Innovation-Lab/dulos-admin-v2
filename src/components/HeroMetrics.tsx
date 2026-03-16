@@ -19,59 +19,64 @@ interface HeroMetricsProps {
   upcoming: MetricData;
 }
 
-const ACCENT = '#E63946';
-
-const METRIC_ICONS: Record<string, { icon: React.ReactNode }> = {
-  'Ingresos del Mes': {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  'Boletos Vendidos': {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-      </svg>
-    ),
-  },
-  'Ocupación Promedio': {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-  },
-  'Funciones Próximas': {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-};
-
-const DEFAULT_ICON = {
-  icon: (
-    <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+const METRIC_ICONS: Record<string, React.ReactNode> = {
+  'Ingresos del Mes': (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="6" width="20" height="12" rx="2" stroke="#E63946" strokeWidth="1.5"/>
+      <path d="M12 9.5c-1.38 0-2.5.672-2.5 1.5s1.12 1.5 2.5 1.5 2.5.672 2.5 1.5-1.12 1.5-2.5 1.5" stroke="#E63946" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M12 8.5v1m0 5v1" stroke="#E63946" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="6" cy="12" r="0.5" fill="#E63946"/>
+      <circle cx="18" cy="12" r="0.5" fill="#E63946"/>
+    </svg>
+  ),
+  'Boletos Vendidos': (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+      <path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v2.5a1.5 1.5 0 010 3V17a2 2 0 01-2 2H6a2 2 0 01-2-2v-4.5a1.5 1.5 0 010-3V7z" stroke="#E63946" strokeWidth="1.5"/>
+      <path d="M9 5v2m0 10v2m0-8v4" stroke="#E63946" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="0 0"/>
+      <path d="M13 9l2 2-2 2" stroke="#E63946" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  'Ocupación Promedio': (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+      <path d="M3 20h18" stroke="#E63946" strokeWidth="1.5" strokeLinecap="round"/>
+      <rect x="5" y="13" width="3" height="7" rx="1" fill="#E63946" fillOpacity="0.15" stroke="#E63946" strokeWidth="1.2"/>
+      <rect x="10.5" y="9" width="3" height="11" rx="1" fill="#E63946" fillOpacity="0.25" stroke="#E63946" strokeWidth="1.2"/>
+      <rect x="16" y="4" width="3" height="16" rx="1" fill="#E63946" fillOpacity="0.4" stroke="#E63946" strokeWidth="1.2"/>
+      <circle cx="17.5" cy="3" r="1" fill="#E63946"/>
+    </svg>
+  ),
+  'Funciones Próximas': (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="5" width="18" height="16" rx="2" stroke="#E63946" strokeWidth="1.5"/>
+      <path d="M3 10h18" stroke="#E63946" strokeWidth="1.5"/>
+      <path d="M8 3v4m8-4v4" stroke="#E63946" strokeWidth="1.5" strokeLinecap="round"/>
+      <rect x="7" y="13" width="2.5" height="2.5" rx="0.5" fill="#E63946" fillOpacity="0.3"/>
+      <rect x="10.75" y="13" width="2.5" height="2.5" rx="0.5" fill="#E63946"/>
+      <rect x="14.5" y="13" width="2.5" height="2.5" rx="0.5" fill="#E63946" fillOpacity="0.3"/>
+      <rect x="7" y="16.5" width="2.5" height="2.5" rx="0.5" fill="#E63946" fillOpacity="0.15"/>
+      <rect x="10.75" y="16.5" width="2.5" height="2.5" rx="0.5" fill="#E63946" fillOpacity="0.15"/>
     </svg>
   ),
 };
 
+const DEFAULT_ICON = (
+  <svg className="w-5 h-5" fill="none" stroke="#E63946" viewBox="0 0 24 24" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+  </svg>
+);
+
 function MetricCard({ metric }: { metric: MetricData }) {
-  const iconData = METRIC_ICONS[metric.label] || DEFAULT_ICON;
+  const icon = METRIC_ICONS[metric.label] || DEFAULT_ICON;
 
   return (
     <div className="metric-card group">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">{metric.label}</p>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{metric.label}</p>
           <p className="text-2xl font-bold text-gray-900 mt-1.5">{metric.value}</p>
         </div>
-        <div className="w-9 h-9 rounded-lg bg-[#E63946]/8 flex items-center justify-center flex-shrink-0">
-          {iconData.icon}
+        <div className="w-10 h-10 rounded-xl bg-[#E63946]/[0.07] flex items-center justify-center flex-shrink-0 group-hover:bg-[#E63946]/[0.12] transition-colors">
+          {icon}
         </div>
       </div>
       <p className="text-xs mt-2">
