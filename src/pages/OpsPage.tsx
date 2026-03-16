@@ -1,48 +1,125 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  fetchCheckins,
+  fetchAllCoupons,
+  Checkin,
+  Coupon,
+} from '../lib/supabase'
 
 const ACCENT = '#E63946'
 const tabs = ['Scanner', 'Historial', 'Cupones'] as const
 
-const checkIns = [
-  { nombre: 'María García', ticket: 'TKT-001234', hora: '19:45', ok: true },
-  { nombre: 'Carlos López', ticket: 'TKT-001235', hora: '19:43', ok: true },
-  { nombre: 'Ana Martínez', ticket: 'TKT-001236', hora: '19:41', ok: false },
-  { nombre: 'Roberto Sánchez', ticket: 'TKT-001237', hora: '19:38', ok: true },
-  { nombre: 'Laura Hernández', ticket: 'TKT-001238', hora: '19:35', ok: true },
-]
+interface CheckinDisplay {
+  nombre: string
+  ticket: string
+  hora: string
+  ok: boolean
+}
 
-const historial = [
-  { ticket: 'TKT-001234', cliente: 'María García', evento: 'Concierto Bad Bunny', hora: '19:45', ok: true },
-  { ticket: 'TKT-001235', cliente: 'Carlos López', evento: 'Concierto Bad Bunny', hora: '19:43', ok: true },
-  { ticket: 'TKT-001236', cliente: 'Ana Martínez', evento: 'Festival Corona', hora: '19:41', ok: false },
-  { ticket: 'TKT-001237', cliente: 'Roberto Sánchez', evento: 'Luis Miguel Tour', hora: '19:38', ok: true },
-  { ticket: 'TKT-001238', cliente: 'Laura Hernández', evento: 'Coldplay World Tour', hora: '19:35', ok: false },
-  { ticket: 'TKT-001239', cliente: 'Pedro Ramírez', evento: 'Concierto Bad Bunny', hora: '19:30', ok: true },
-  { ticket: 'TKT-001240', cliente: 'Sofia Torres', evento: 'Festival Corona', hora: '19:28', ok: true },
-  { ticket: 'TKT-001241', cliente: 'Miguel Flores', evento: 'Luis Miguel Tour', hora: '19:25', ok: true },
-]
+interface HistorialDisplay {
+  ticket: string
+  cliente: string
+  evento: string
+  hora: string
+  ok: boolean
+}
 
-const cuponesInit = [
-  { id: 1, nombre: 'VERANO2026', descuento: '15%', usado: 45, total: 100, activo: true },
-  { id: 2, nombre: 'PRIMERACOMPRA', descuento: '20%', usado: 234, total: 500, activo: true },
-  { id: 3, nombre: 'FIJO50', descuento: '$50', usado: 89, total: 200, activo: true },
-  { id: 4, nombre: 'BLACKFRIDAY', descuento: '30%', usado: 100, total: 100, activo: false },
-]
+interface CuponDisplay {
+  id: string
+  nombre: string
+  descuento: string
+  usado: number
+  total: number
+  activo: boolean
+}
 
-const eventosUnicos = [...new Set(historial.map(h => h.evento))]
+function formatTime(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+}
+
+function SkeletonRow() {
+  return (
+    <div className="flex items-center justify-between p-3 bg-[#f8f6f6] rounded-lg animate-pulse">
+      <div>
+        <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+        <div className="h-3 bg-gray-200 rounded w-24"></div>
+      </div>
+      <div className="h-4 bg-gray-200 rounded w-16"></div>
+    </div>
+  )
+}
 
 export default function OpsPage() {
   const [activeTab, setActiveTab] = useState<typeof tabs[number]>('Scanner')
-  const [cupones, setCupones] = useState(cuponesInit)
+  const [loading, setLoading] = useState(true)
+  const [checkIns, setCheckIns] = useState<CheckinDisplay[]>([])
+  const [historial, setHistorial] = useState<HistorialDisplay[]>([])
+  const [cupones, setCupones] = useState<CuponDisplay[]>([])
+  const [eventosUnicos, setEventosUnicos] = useState<string[]>([])
   const [filtroEvento, setFiltroEvento] = useState('')
   const [busquedaCliente, setBusquedaCliente] = useState('')
-  const [checkInCount, setCheckInCount] = useState(234)
+  const [checkInCount, setCheckInCount] = useState(0)
   const [cameraActive, setCameraActive] = useState(false)
-  const [cameraError, setCameraError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [checkinsData, couponsData] = await Promise.all([
+          fetchCheckins(),
+          fetchAllCoupons(),
+        ])
+
+        // Map checkins to display format
+        const checkInsDisplay: CheckinDisplay[] = checkinsData.slice(0, 5).map((c) => ({
+          nombre: c.customer_name,
+          ticket: c.ticket_number,
+          hora: formatTime(c.scanned_at),
+          ok: c.status === 'success' || c.status === 'valid',
+        }))
+        setCheckIns(checkInsDisplay)
+
+        // Map checkins to historial format
+        const historialDisplay: HistorialDisplay[] = checkinsData.map((c) => ({
+          ticket: c.ticket_number,
+          cliente: c.customer_name,
+          evento: c.event_name,
+          hora: formatTime(c.scanned_at),
+          ok: c.status === 'success' || c.status === 'valid',
+        }))
+        setHistorial(historialDisplay)
+
+        // Get unique events
+        const eventos = [...new Set(checkinsData.map((c) => c.event_name))]
+        setEventosUnicos(eventos)
+
+        // Set checkin count
+        setCheckInCount(checkinsData.length)
+
+        // Map coupons to display format
+        const cuponesDisplay: CuponDisplay[] = couponsData.map((c) => ({
+          id: c.id,
+          nombre: c.code,
+          descuento: c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value}`,
+          usado: c.used_count,
+          total: c.max_uses || 999,
+          activo: c.is_active,
+        }))
+        setCupones(cuponesDisplay)
+
+        setLoading(false)
+      } catch (error) {
+        console.error('Error loading ops data:', error)
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -58,7 +135,7 @@ export default function OpsPage() {
   const startCamera = useCallback(async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('Tu navegador no soporta acceso a la cámara')
+        alert('Tu navegador no soporta acceso a la camara')
         return
       }
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -74,21 +151,15 @@ export default function OpsPage() {
       const error = err as Error
       let errorMsg: string
       if (error.name === 'NotAllowedError') {
-        errorMsg = 'Permiso de cámara denegado. Por favor habilita el acceso en tu navegador.'
+        errorMsg = 'Permiso de camara denegado. Por favor habilita el acceso en tu navegador.'
       } else if (error.name === 'NotFoundError') {
-        errorMsg = 'No se encontró ninguna cámara en este dispositivo.'
+        errorMsg = 'No se encontro ninguna camara en este dispositivo.'
       } else {
-        errorMsg = 'No se pudo acceder a la cámara: ' + error.message
+        errorMsg = 'No se pudo acceder a la camara: ' + error.message
       }
       alert(errorMsg)
     }
   }, [])
-
-  useEffect(() => {
-    if (activeTab !== 'Scanner') return
-    const interval = setInterval(() => setCheckInCount(c => Math.min(c + 1, 1200)), 5000)
-    return () => clearInterval(interval)
-  }, [activeTab])
 
   useEffect(() => {
     if (activeTab !== 'Scanner') {
@@ -102,8 +173,33 @@ export default function OpsPage() {
     return matchEvento && matchCliente
   })
 
-  const toggleCupon = (id: number) => {
+  const toggleCupon = (id: string) => {
     setCupones(cupones.map(c => c.id === id ? { ...c, activo: !c.activo } : c))
+  }
+
+  // Calculate stats for reports
+  const checkInsByEvent = historial.reduce((acc, h) => {
+    acc[h.evento] = (acc[h.evento] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const totalCheckins = historial.length
+  const eventStats = Object.entries(checkInsByEvent)
+    .map(([name, count]) => ({ n: name.split(' ')[0], p: Math.round((count / totalCheckins) * 100) }))
+    .sort((a, b) => b.p - a.p)
+    .slice(0, 4)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f8f6f6] p-6">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">Operaciones</h1>
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -161,12 +257,12 @@ export default function OpsPage() {
                 <>
                   <span className="text-6xl">📷</span>
                   <p className="text-white text-lg">QR Scanner</p>
-                  <p className="text-gray-400 text-sm text-center">Apunta al código QR del boleto</p>
+                  <p className="text-gray-400 text-sm text-center">Apunta al codigo QR del boleto</p>
                   <button
                     onClick={startCamera}
                     className="px-4 py-2 bg-[#E63946] text-white rounded-lg font-medium hover:bg-[#c5303c] transition-colors cursor-pointer"
                   >
-                    Iniciar Cámara
+                    Iniciar Camara
                   </button>
                 </>
               )}
@@ -174,7 +270,7 @@ export default function OpsPage() {
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Check-ins Recientes</h3>
               <div className="space-y-3">
-                {checkIns.map((c, i) => (
+                {checkIns.length > 0 ? checkIns.map((c, i) => (
                   <div key={i} className="flex items-center justify-between p-3 bg-[#f8f6f6] rounded-lg">
                     <div>
                       <p className="font-medium text-gray-900">{c.nombre}</p>
@@ -183,11 +279,13 @@ export default function OpsPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-500">{c.hora}</span>
                       <span className={c.ok ? 'text-green-500 text-xl' : 'text-red-500 text-xl'}>
-                        {c.ok ? '✓' : '✗'}
+                        {c.ok ? '\u2713' : '\u2717'}
                       </span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-gray-500 text-center py-4">No hay check-ins recientes</p>
+                )}
               </div>
             </div>
           </div>
@@ -225,7 +323,7 @@ export default function OpsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {historialFiltrado.map((h, i) => (
+                  {historialFiltrado.length > 0 ? historialFiltrado.map((h, i) => (
                     <tr key={i} className="border-t border-gray-100 hover:bg-[#f8f6f6]">
                       <td className="py-3 px-4 text-sm font-mono text-gray-900">{h.ticket}</td>
                       <td className="py-3 px-4 text-sm text-gray-900">{h.cliente}</td>
@@ -233,11 +331,17 @@ export default function OpsPage() {
                       <td className="py-3 px-4 text-sm text-gray-500">{h.hora}</td>
                       <td className="py-3 px-4">
                         <span className={h.ok ? 'text-green-500 text-lg' : 'text-red-500 text-lg'}>
-                          {h.ok ? '✓' : '✗'}
+                          {h.ok ? '\u2713' : '\u2717'}
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-500">
+                        No hay registros de check-in
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -245,32 +349,33 @@ export default function OpsPage() {
               <h3 className="text-lg font-bold mb-4">Reportes de Acceso</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h4 className="font-semibold text-gray-900 mb-4">Check-ins por Hora</h4>
-                  {[{ h: '18:00', v: 45 }, { h: '19:00', v: 120 }, { h: '20:00', v: 89 }, { h: '21:00', v: 156 }, { h: '22:00', v: 34 }].map(d => (
-                    <div key={d.h} className="flex items-center gap-3 mb-2">
-                      <span className="text-sm text-gray-600 w-12">{d.h}</span>
-                      <div className="flex-1 h-5 bg-gray-100 rounded"><div className="h-full rounded" style={{ width: `${(d.v / 156) * 100}%`, backgroundColor: '#E63946' }} /></div>
-                      <span className="text-sm text-gray-600 w-8">{d.v}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="bg-white rounded-xl p-6 shadow-sm">
                   <h4 className="font-semibold text-gray-900 mb-4">Check-ins por Evento</h4>
-                  {[{ n: 'Lucero', p: 45 }, { n: 'Oh Karen', p: 25 }, { n: 'Infierno', p: 20 }, { n: 'Otros', p: 10 }].map(d => (
+                  {eventStats.length > 0 ? eventStats.map(d => (
                     <div key={d.n} className="flex items-center gap-3 mb-2">
                       <span className="text-sm text-gray-600 w-20 truncate">{d.n}</span>
                       <div className="flex-1 h-5 bg-gray-100 rounded"><div className="h-full rounded" style={{ width: `${d.p}%`, backgroundColor: '#E63946' }} /></div>
                       <span className="text-sm text-gray-600 w-10">{d.p}%</span>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-gray-500 text-sm">No hay datos disponibles</p>
+                  )}
                 </div>
-              </div>
-              <div className="bg-white rounded-xl p-6 shadow-sm mt-6">
-                <h4 className="font-semibold text-gray-900 mb-4">Top Operadores</h4>
-                <div className="flex flex-col md:flex-row gap-4 md:gap-8">
-                  {[{ n: 'Juan Pérez', c: 89 }, { n: 'Ana López', c: 76 }, { n: 'Carlos Ruiz', c: 64 }].map(o => (
-                    <div key={o.n} className="text-center"><p className="font-medium text-gray-900">{o.n}</p><p className="text-sm text-gray-500">{o.c} check-ins</p></div>
-                  ))}
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <h4 className="font-semibold text-gray-900 mb-4">Resumen</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total check-ins</span>
+                      <span className="font-bold">{totalCheckins}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Exitosos</span>
+                      <span className="font-bold text-green-600">{historial.filter(h => h.ok).length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Fallidos</span>
+                      <span className="font-bold text-red-600">{historial.filter(h => !h.ok).length}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -282,7 +387,7 @@ export default function OpsPage() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Cupones</h3>
               <button
-                onClick={() => alert('Crear nuevo cupón')}
+                onClick={() => alert('Crear nuevo cupon')}
                 className="px-4 py-2 text-white rounded-lg"
                 style={{ backgroundColor: ACCENT }}
               >
@@ -290,7 +395,7 @@ export default function OpsPage() {
               </button>
             </div>
             <div className="space-y-4">
-              {cupones.map(c => (
+              {cupones.length > 0 ? cupones.map(c => (
                 <div key={c.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
@@ -315,14 +420,16 @@ export default function OpsPage() {
                       <span className={`block w-4 h-4 bg-white rounded-full transition-transform ${c.activo ? 'translate-x-7' : 'translate-x-1'}`} />
                     </button>
                     <button
-                      onClick={() => alert('Editar cupón')}
+                      onClick={() => alert('Editar cupon')}
                       className="text-sm text-gray-500 hover:text-gray-700"
                     >
                       Editar
                     </button>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-gray-500 text-center py-8">No hay cupones configurados</p>
+              )}
             </div>
           </div>
         )}

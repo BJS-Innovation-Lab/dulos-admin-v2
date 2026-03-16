@@ -181,8 +181,8 @@ export default function SummaryPage() {
           fetchEscalations(),
         ]);
 
-        // Calculate metrics
-        const totalRevenue = orders.reduce((sum, order) => sum + order.total_price, 0);
+        // Calculate metrics - use zones for revenue since orders may be empty
+        const totalRevenue = zones.reduce((sum, zone) => sum + (zone.sold * zone.price), 0);
         const totalTickets = zones.reduce((sum, zone) => sum + zone.sold, 0);
         const totalAvailable = zones.reduce((sum, zone) => sum + zone.available + zone.sold, 0);
         const occupancy = totalAvailable > 0 ? Math.round((totalTickets / totalAvailable) * 100) : 0;

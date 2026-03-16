@@ -126,6 +126,9 @@ export interface TeamMember {
   name: string;
   email: string;
   role: string;
+  permissions_count?: number;
+  is_active: boolean;
+  last_login?: string;
   avatar_url?: string;
   created_at: string;
 }
@@ -258,6 +261,33 @@ export async function fetchTeam(): Promise<TeamMember[]> {
     return await supabaseFetch<TeamMember[]>('dulos_team?order=role');
   } catch (error) {
     console.error('Error fetching team:', error);
+    throw error;
+  }
+}
+
+export async function fetchAllEvents(): Promise<DulosEvent[]> {
+  try {
+    return await supabaseFetch<DulosEvent[]>('dulos_events?order=dates.desc');
+  } catch (error) {
+    console.error('Error fetching all events:', error);
+    throw error;
+  }
+}
+
+export async function fetchAllCoupons(): Promise<Coupon[]> {
+  try {
+    return await supabaseFetch<Coupon[]>('dulos_coupons?order=created_at.desc');
+  } catch (error) {
+    console.error('Error fetching all coupons:', error);
+    throw error;
+  }
+}
+
+export async function fetchAllOrders(): Promise<Order[]> {
+  try {
+    return await supabaseFetch<Order[]>('dulos_orders?order=purchased_at.desc');
+  } catch (error) {
+    console.error('Error fetching all orders:', error);
     throw error;
   }
 }
