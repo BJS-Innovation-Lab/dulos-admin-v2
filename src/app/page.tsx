@@ -10,8 +10,8 @@ import AdminPage from "@/pages/AdminPage";
 import AdminShell from "@/layouts/AdminShell";
 
 const supabase = createClient(
-  "https://udjwabtyhjcrpyuffavz.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4"
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -25,11 +25,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 async function validateTeamMember(email: string): Promise<{ valid: boolean; user: any; error?: string }> {
   try {
     const res = await fetch(
-      `https://udjwabtyhjcrpyuffavz.supabase.co/rest/v1/dulos_team?email=eq.${encodeURIComponent(email)}&select=*`,
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dulos_team?email=eq.${encodeURIComponent(email)}&select=*`,
       {
         headers: {
-          apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4",
-          Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4",
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
         },
       }
     );
@@ -69,48 +69,37 @@ export default function Home() {
     let mounted = true;
 
     const init = async () => {
-      // 1. Check localStorage for existing session
-      const stored = localStorage.getItem("dulos_user");
       const secVersion = localStorage.getItem("dulos_sec_v");
       // Force re-auth if security version changed
-      if (secVersion !== "v3") {
+      if (secVersion !== "v4") {
+        localStorage.removeItem("dulos_user");
+        localStorage.removeItem("dulos_sec_v");
+      }
+
+      // SECURITY: Always verify Supabase session FIRST — never trust localStorage alone
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.user?.email) {
+        // No valid Supabase session — clear localStorage and show login
         localStorage.removeItem("dulos_user");
         localStorage.removeItem("dulos_sec_v");
         if (mounted) setLoading(false);
         return;
       }
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Re-validate against dulos_team every time
-        const result = await validateTeamMember(parsed.email);
-        if (result.valid) {
-          if (mounted) { setUser(result.user); setLoading(false); }
-        } else {
-          // User was removed or deactivated — clear session
-          localStorage.removeItem("dulos_user");
-          await supabase.auth.signOut();
-          if (mounted) { setAuthError(result.error || "Sesión expirada"); setLoading(false); }
-        }
-        return;
-      }
 
-      // 2. Check Supabase session (Google OAuth return)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        const result = await validateTeamMember(session.user.email);
-        if (result.valid) {
-          localStorage.setItem("dulos_user", JSON.stringify(result.user));
-          localStorage.setItem("dulos_sec_v", "v3");
-          if (mounted) { setUser(result.user); setLoading(false); }
-        } else {
-          // NOT authorized — sign out immediately
-          await supabase.auth.signOut();
-          if (mounted) { setAuthError(result.error || "Acceso denegado"); setLoading(false); }
-        }
-        return;
+      // Valid Supabase session — now validate against dulos_team
+      const result = await validateTeamMember(session.user.email);
+      if (result.valid) {
+        localStorage.setItem("dulos_user", JSON.stringify(result.user));
+        localStorage.setItem("dulos_sec_v", "v4");
+        if (mounted) { setUser(result.user); setLoading(false); }
+      } else {
+        // NOT authorized — sign out and clear everything
+        await supabase.auth.signOut();
+        localStorage.removeItem("dulos_user");
+        localStorage.removeItem("dulos_sec_v");
+        if (mounted) { setAuthError(result.error || "Acceso denegado"); setLoading(false); }
       }
-
-      if (mounted) setLoading(false);
     };
 
     init();
@@ -133,7 +122,7 @@ export default function Home() {
           const result = await validateTeamMember(u.email);
           if (result.valid) {
             localStorage.setItem("dulos_user", JSON.stringify(result.user));
-            localStorage.setItem("dulos_sec_v", "v3");
+            localStorage.setItem("dulos_sec_v", "v4");
             setUser(result.user);
             setAuthError("");
           } else {
