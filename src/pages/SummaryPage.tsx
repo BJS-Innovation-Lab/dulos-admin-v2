@@ -17,6 +17,28 @@ import {
   Escalation,
 } from '../lib/supabase';
 
+interface Alerta {
+  id: number | string;
+  tipo: 'critico' | 'warning' | 'info';
+  mensaje: string;
+}
+
+interface Actividad {
+  id: string;
+  tipo: string;
+  mensaje: string;
+  tiempo: string;
+}
+
+interface ClienteDisplay {
+  id: string;
+  nombre: string;
+  email: string;
+  ordenes: number;
+  gastado: number;
+  boletos: number;
+}
+
 const mockMetrics = {
   revenue: {
     label: 'Ingresos del Mes',
@@ -44,7 +66,7 @@ const mockMetrics = {
   },
 };
 
-const mockAlertas = [
+const mockAlertas: Alerta[] = [
   { id: 1, tipo: 'critico', mensaje: 'Función "Romeo y Julieta" 18:00 - Solo quedan 5 lugares disponibles' },
   { id: 2, tipo: 'critico', mensaje: 'Error en terminal de pago #3 - Requiere atención inmediata' },
   { id: 3, tipo: 'warning', mensaje: 'Stock bajo de boletos impresos para Sala Principal' },
@@ -135,28 +157,6 @@ function SkeletonMetrics() {
       ))}
     </div>
   );
-}
-
-interface Alerta {
-  id: number | string;
-  tipo: 'critico' | 'warning' | 'info';
-  mensaje: string;
-}
-
-interface Actividad {
-  id: string;
-  tipo: string;
-  mensaje: string;
-  tiempo: string;
-}
-
-interface ClienteDisplay {
-  id: string;
-  nombre: string;
-  email: string;
-  ordenes: number;
-  gastado: number;
-  boletos: number;
 }
 
 export default function SummaryPage() {
