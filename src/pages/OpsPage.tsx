@@ -104,8 +104,12 @@ export default function OpsPage() {
   // Notification filter
   const [notifFilter, setNotifFilter] = useState(false)
 
+  // Customer history drill-down
+  const [customerHistory, setCustomerHistory] = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
   // Helper to search customers
-  const { searchCustomerByNameOrEmail } = require('../lib/supabase')
+  const { searchCustomerByNameOrEmail, fetchCustomerHistory } = require('../lib/supabase')
 
   useEffect(() => {
     Promise.all([
@@ -131,10 +135,30 @@ export default function OpsPage() {
       const results = await searchCustomerByNameOrEmail(customerSearch.trim())
       setSearchResults(results)
       setExpandedCustomer(null)
+      setCustomerHistory([])
     } catch (error) {
       console.error('Error searching customers:', error)
       toast.error('Error al buscar clientes')
     }
+  }
+
+  // Fetch customer history on expand
+  const handleExpandCustomer = async (customerId: string) => {
+    if (expandedCustomer === customerId) {
+      setExpandedCustomer(null)
+      setCustomerHistory([])
+      return
+    }
+    setExpandedCustomer(customerId)
+    setHistoryLoading(true)
+    try {
+      const history = await fetchCustomerHistory(customerId)
+      setCustomerHistory(history)
+    } catch (error) {
+      console.error('Error fetching customer history:', error)
+      setCustomerHistory([])
+    }
+    setHistoryLoading(false)
   }
 
   const stopCamera = useCallback(() => {
@@ -696,7 +720,7 @@ export default function OpsPage() {
                   {searchResults.map(customer => (
                     <div key={customer.id} className="border border-gray-200 rounded-lg overflow-hidden">
                       <div
-                        onClick={() => setExpandedCustomer(expandedCustomer === customer.id ? null : customer.id)}
+                        onClick={() => handleExpandCustomer(customer.id)}
                         className="p-2 sm:p-3 cursor-pointer hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex justify-between items-center">
@@ -736,38 +760,48 @@ export default function OpsPage() {
                         style={{ maxHeight: expandedCustomer === customer.id ? '500px' : '0px', opacity: expandedCustomer === customer.id ? 1 : 0 }}
                       >
                         <div className="border-t border-gray-100 bg-gray-50 p-3">
-                          <p className="text-xs font-bold text-gray-600 mb-2">Historial de boletos</p>
-                          {(customer as any).tickets?.length > 0 ? (
+                          <p className="text-xs font-bold text-gray-600 mb-2">Historial de compras</p>
+                          {historyLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="w-5 h-5 border-2 border-[#EF4444] border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          ) : customerHistory.length > 0 ? (
                             <div className="space-y-1.5">
-                              {(customer as any).tickets.map((ticket: Ticket, idx: number) => (
-                                <div key={idx} className="flex items-center justify-between bg-white rounded p-2 text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-mono text-[#EF4444] font-bold">{ticket.ticket_number}</span>
-                                    <span className="text-gray-500 hidden sm:inline">{ticket.zone_name}</span>
+                              {customerHistory.map((h: any, idx: number) => (
+                                <div key={idx} className="bg-white rounded-lg p-2.5 text-xs border border-gray-100">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-[#EF4444] font-bold text-[11px]">{h.order_number}</span>
+                                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                                        h.payment_status === 'completed' ? 'bg-green-500' :
+                                        h.payment_status === 'refunded' ? 'bg-red-500' : 'bg-yellow-500'
+                                      }`}>
+                                        {h.payment_status === 'completed' ? 'Pagado' : h.payment_status === 'refunded' ? 'Reembolsado' : h.payment_status}
+                                      </span>
+                                    </div>
+                                    <span className="font-black text-[#1E293B]">${(h.total_price || 0).toLocaleString()}</span>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-gray-400 hidden sm:inline">{new Date(ticket.created_at).toLocaleDateString('es-MX')}</span>
-                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${
-                                      ticket.status === 'valid' ? 'bg-green-500' :
-                                      ticket.status === 'used' ? 'bg-blue-500' : 'bg-yellow-500'
-                                    }`}>
-                                      {ticket.status === 'valid' ? 'Válido' : ticket.status === 'used' ? 'Usado' : 'Pendiente'}
-                                    </span>
+                                  <div className="flex items-center gap-1.5 text-gray-500">
+                                    <span className="font-bold text-gray-700">{h.event_name}</span>
+                                    <span>·</span>
+                                    <span>{h.venue_name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1 text-gray-400">
+                                    <span>{h.zone_name} × {h.quantity}</span>
+                                    {h.event_date && <span>· {new Date(h.event_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</span>}
+                                    {h.ticket_used && <span className="text-blue-500 font-bold">✓ Usado</span>}
                                   </div>
                                 </div>
                               ))}
+                              {customerHistory[0]?.is_vip && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">⭐ VIP</span>
+                                </div>
+                              )}
                             </div>
                           ) : (
-                            <p className="text-xs text-gray-400 text-center py-2">Sin boletos</p>
+                            <p className="text-xs text-gray-400 text-center py-2">Sin historial de compras</p>
                           )}
-                          <div className="mt-2 pt-2 border-t border-gray-200 flex justify-end">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedCustomer(customer); }}
-                              className="text-xs text-[#EF4444] font-bold hover:underline"
-                            >
-                              Ver perfil completo
-                            </button>
-                          </div>
                         </div>
                       </div>
                     </div>
