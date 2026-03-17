@@ -8,7 +8,7 @@ import type { MetricData } from '../components/HeroMetrics';
 import {
   fetchEvents,
   fetchZones,
-  fetchOrders,
+  fetchAllOrders,
   fetchCheckins,
   fetchEscalations,
   fetchTickets,
@@ -144,7 +144,7 @@ export default function SummaryPage() {
         const [events, zones, orders, checkins, escalations, tickets, schedules, venues, salesData] = await Promise.all([
           fetchEvents().catch(() => [] as DulosEvent[]),
           fetchZones().catch(() => [] as TicketZone[]),
-          fetchOrders().catch(() => [] as Order[]),
+          fetchAllOrders().catch(() => [] as Order[]),
           fetchCheckins().catch(() => [] as Checkin[]),
           fetchEscalations().catch(() => [] as Escalation[]),
           fetchTickets().catch(() => [] as Ticket[]),
@@ -165,11 +165,23 @@ export default function SummaryPage() {
         const totalOrders = salesData.reduce((sum, s) => sum + s.total_orders, 0);
         const avgTicketPrice = totalTicketsSold > 0 ? totalRevenue / totalTicketsSold : 0;
 
-        // Period comparison: simulate +10% baseline (no historical data to compare)
-        const revenueChange = totalRevenue > 0 ? 12.3 : 0;
-        const ordersChange = totalOrders > 0 ? 8.7 : 0;
-        const ticketsChange = totalTicketsSold > 0 ? 10.2 : 0;
-        const avgPriceChange = avgTicketPrice > 0 ? 3.1 : 0;
+        // Period comparison: current 30d vs previous 30d from real order dates
+        const nowDate = new Date();
+        const thirtyDaysAgo = new Date(nowDate.getTime() - 30 * 86400000);
+        const sixtyDaysAgo = new Date(nowDate.getTime() - 60 * 86400000);
+        const curOrders = orders.filter(o => new Date(o.purchased_at) >= thirtyDaysAgo);
+        const prevOrders = orders.filter(o => { const d = new Date(o.purchased_at); return d >= sixtyDaysAgo && d < thirtyDaysAgo; });
+        const curRev = curOrders.reduce((s, o) => s + (o.total_price || 0), 0);
+        const prevRev = prevOrders.reduce((s, o) => s + (o.total_price || 0), 0);
+        const curTix = curOrders.reduce((s, o) => s + (o.quantity || 0), 0);
+        const prevTix = prevOrders.reduce((s, o) => s + (o.quantity || 0), 0);
+        const pctChange = (c: number, p: number) => p > 0 ? Math.round(((c - p) / p) * 1000) / 10 : 0;
+        const revenueChange = pctChange(curRev, prevRev);
+        const ordersChange = pctChange(curOrders.length, prevOrders.length);
+        const ticketsChange = pctChange(curTix, prevTix);
+        const curAvg = curTix > 0 ? curRev / curTix : 0;
+        const prevAvg = prevTix > 0 ? prevRev / prevTix : 0;
+        const avgPriceChange = pctChange(curAvg, prevAvg);
 
         const fmtCurrency = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN`;
 

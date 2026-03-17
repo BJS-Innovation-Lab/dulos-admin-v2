@@ -15,9 +15,11 @@ import {
   fetchTickets,
   fetchRevenueByEvent,
   fetchSalesSummary,
+  fetchTransactionsPaginated,
   DulosEvent,
   TicketZone,
   Ticket,
+  Order,
   Schedule,
   SalesSummary,
 } from '../lib/supabase';
@@ -138,6 +140,7 @@ export default function FinancePage() {
   const [rawSchedules, setRawSchedules] = useState<Schedule[]>([]);
   const [rawEventRevenues, setRawEventRevenues] = useState<{ event_id: string; event_name: string; revenue: number; image_url?: string }[]>([]);
   const [salesSummary, setSalesSummary] = useState<SalesSummary[]>([]);
+  const [rawOrders, setRawOrders] = useState<Order[]>([]);
   const [pedidosData] = useState<{ headers: string[]; rows: any[]; totalRows: number }>({ headers: [], rows: [], totalRows: 0 });
 
   // UI state
@@ -146,11 +149,16 @@ export default function FinancePage() {
   const [txSort, setTxSort] = useState<{ col: keyof Transaction; asc: boolean }>({ col: 'date', asc: false });
   const [txPage, setTxPage] = useState(0);
 
+  // Server-side transaction state
+  const [serverTxData, setServerTxData] = useState<Order[]>([]);
+  const [serverTxCount, setServerTxCount] = useState(0);
+  const [serverTxLoading, setServerTxLoading] = useState(false);
+
   // Fetch all data once
   useEffect(() => {
     async function loadData() {
       try {
-        const [zones, _orders, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData] = await Promise.all([
+        const [zones, ordersData, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData] = await Promise.all([
           fetchZones().catch(() => [] as TicketZone[]),
           fetchAllOrders().catch(() => []),
           fetchSchedules().catch(() => [] as Schedule[]),
@@ -165,6 +173,7 @@ export default function FinancePage() {
         setEvents(eventsData);
         setRawEventRevenues(revenueByEvent);
         setSalesSummary(salesSummaryData);
+        setRawOrders(ordersData);
       } catch (error) {
         console.error('Error loading finance data:', error);
       } finally {
@@ -396,6 +405,28 @@ export default function FinancePage() {
 
     const summaryStats = { bestDay, avgTicketPrice, popularEvent, popularZone };
 
+    // --- UTM / Marketing data from orders ---
+    const utmSourceMap = new Map<string, { count: number; revenue: number }>();
+    const deviceMap = new Map<string, number>();
+    const filteredOrders = selectedEvent ? rawOrders.filter(o => o.event_id === selectedEvent) : rawOrders;
+    filteredOrders.forEach(o => {
+      const source = o.utm_source || 'Directo';
+      const existing = utmSourceMap.get(source) || { count: 0, revenue: 0 };
+      existing.count++;
+      existing.revenue += o.total_price || 0;
+      utmSourceMap.set(source, existing);
+
+      const device = o.device_type || 'Desconocido';
+      deviceMap.set(device, (deviceMap.get(device) || 0) + 1);
+    });
+    const utmSources = Array.from(utmSourceMap.entries())
+      .map(([source, data]) => ({ source, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
+    const deviceBreakdown = Array.from(deviceMap.entries())
+      .map(([device, count]) => ({ device, count }))
+      .sort((a, b) => b.count - a.count);
+
     // --- Commission calculations (10% for Dulos, 90% for producers) ---
     const totalComissionRevenue = filteredSalesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
     const dulosCommission = totalComissionRevenue * 0.10;
@@ -467,11 +498,55 @@ export default function FinancePage() {
       eventOccupancy,
       summaryStats,
       commissionData,
+      utmSources,
+      deviceBreakdown,
     };
-  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, pedidosData, selectedEvent, dateRange]);
+  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange]);
 
   // Reset txPage when filters change
   useEffect(() => { setTxPage(0); }, [selectedEvent, dateRange, txSearch, txSort]);
+
+  // Server-side transaction loading
+  useEffect(() => {
+    if (activeTab !== 'transacciones') return;
+    let cancelled = false;
+    async function loadTransactions() {
+      setServerTxLoading(true);
+      try {
+        const sortColMap: Record<string, string> = {
+          date: 'purchased_at',
+          customer_name: 'customer_name',
+          event_name: 'event_id',
+          zone_name: 'zone_name',
+          amount: 'total_price',
+          status: 'payment_status',
+          id: 'order_number',
+          customer_email: 'customer_email',
+        };
+        const sortCol = sortColMap[txSort.col] || 'purchased_at';
+        const sortDir = txSort.asc ? 'asc' as const : 'desc' as const;
+        const result = await fetchTransactionsPaginated(
+          txPage + 1,
+          PER_PAGE,
+          sortCol,
+          sortDir,
+          selectedEvent || undefined,
+          undefined,
+          txSearch || undefined
+        );
+        if (!cancelled) {
+          setServerTxData(result.data);
+          setServerTxCount(result.count);
+        }
+      } catch (err) {
+        console.error('Error loading transactions:', err);
+      } finally {
+        if (!cancelled) setServerTxLoading(false);
+      }
+    }
+    loadTransactions();
+    return () => { cancelled = true; };
+  }, [activeTab, txPage, txSort, txSearch, selectedEvent]);
 
   const exportCSV = () => {
     if (!computed) return;
@@ -560,7 +635,7 @@ export default function FinancePage() {
 
   if (!computed) return null;
 
-  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats, commissionData } = computed;
+  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats, commissionData, utmSources, deviceBreakdown } = computed;
 
   return (
     <div className="space-y-4">
@@ -928,6 +1003,73 @@ export default function FinancePage() {
                   <p className="text-xs sm:text-sm text-gray-500">Zona mas popular</p>
                   <p className="text-base sm:text-lg font-extrabold text-gray-900">{summaryStats.popularZone}</p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Marketing / UTM Sources */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="section-card">
+              <div className="section-card-header">
+                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <span className="section-card-title">Fuentes de Tráfico (UTM)</span>
+              </div>
+              <div className="section-card-body">
+                {utmSources.length > 0 ? (
+                  <div className="space-y-2">
+                    {utmSources.map((s, i) => {
+                      const maxRevenue = utmSources[0]?.revenue || 1;
+                      const pct = Math.round((s.revenue / maxRevenue) * 100);
+                      return (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-gray-700 w-20 truncate flex-shrink-0">{s.source}</span>
+                          <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#EF4444] rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-gray-900 w-20 text-right flex-shrink-0">{fmtCurrency(s.revenue)}</span>
+                          <span className="text-[10px] text-gray-400 w-12 text-right flex-shrink-0">{s.count} ord.</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 text-sm py-4">Sin datos de UTM</p>
+                )}
+              </div>
+            </div>
+
+            <div className="section-card">
+              <div className="section-card-header">
+                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="section-card-title">Dispositivos</span>
+              </div>
+              <div className="section-card-body">
+                {deviceBreakdown.length > 0 ? (
+                  <div className="space-y-2">
+                    {deviceBreakdown.map((d, i) => {
+                      const total = deviceBreakdown.reduce((s, x) => s + x.count, 0);
+                      const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
+                      return (
+                        <div key={i} className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-700 capitalize">{d.device}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#1E293B] rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs font-bold text-gray-900 w-10 text-right">{pct}%</span>
+                            <span className="text-[10px] text-gray-400 w-8 text-right">{d.count}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 text-sm py-4">Sin datos de dispositivos</p>
+                )}
               </div>
             </div>
           </div>

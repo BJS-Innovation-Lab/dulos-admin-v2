@@ -8,6 +8,7 @@ import {
   fetchZones,
   fetchAllOrders,
   fetchSchedules,
+  fetchEventDashboard,
   getVenueMap,
   getVenueName,
   getVenueCity,
@@ -16,6 +17,7 @@ import {
   Order,
   Schedule,
   Venue,
+  EventDashboard,
 } from '../lib/supabase';
 import { createEvent, updateEvent, archiveEvent } from '../app/actions/events.actions';
 
@@ -26,7 +28,7 @@ interface ProjectDisplay {
   name: string;
   producer: string;
   image_url: string;
-  status: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'FINALIZADO';
+  status: 'active' | 'draft' | 'sold_out' | 'cancelled' | 'completed';
   events: EventDisplay[];
   isPast: boolean;
   revenue: number;
@@ -101,10 +103,23 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 
 const getStatusColor = (status: ProjectDisplay['status']) => {
   switch (status) {
-    case 'PUBLISHED': return 'bg-green-500';
-    case 'DRAFT': return 'bg-yellow-500';
-    case 'ARCHIVED': return 'bg-gray-500';
-    case 'FINALIZADO': return 'bg-blue-500';
+    case 'active': return 'bg-green-500';
+    case 'draft': return 'bg-yellow-500';
+    case 'sold_out': return 'bg-[#EF4444]';
+    case 'cancelled': return 'bg-gray-500';
+    case 'completed': return 'bg-blue-500';
+    default: return 'bg-gray-400';
+  }
+};
+
+const getStatusLabel = (status: ProjectDisplay['status']): string => {
+  switch (status) {
+    case 'active': return 'Activo';
+    case 'draft': return 'Borrador';
+    case 'sold_out': return 'Agotado';
+    case 'cancelled': return 'Cancelado';
+    case 'completed': return 'Finalizado';
+    default: return status;
   }
 };
 
@@ -397,13 +412,25 @@ function ActionsMenu({
 
 /* ─── Inline Detail Panel ─── */
 
-function EventDetailPanel({ project }: { project: ProjectDisplay }) {
+function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay; dashboardData: EventDashboard[] }) {
+  const eventId = project.events[0]?.id;
+  const eventDashZones = dashboardData.filter(d => d.event_id === eventId);
+
   const totalRevenue = project.events.reduce((s, e) => s + e.revenue, 0);
   const totalSold = project.events.reduce((s, e) => s + e.ticketsSold, 0);
   const totalCapacity = project.events.reduce((s, e) => s + e.totalTickets, 0);
   const occupancy = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
 
-  const allZones = project.events.flatMap((e) => e.zones);
+  // Use real occupancy from v_event_dashboard if available, fallback to manual zones
+  const allZones: ZoneDisplay[] = eventDashZones.length > 0
+    ? eventDashZones.map((d, idx) => ({
+        id: `dash-${eventId}-${idx}`,
+        nombre: d.zone_name,
+        precio: d.zone_price,
+        capacidad: d.zone_sold + d.zone_available,
+        vendidos: d.zone_sold,
+      }))
+    : project.events.flatMap((e) => e.zones);
   const allSchedules = project.events.flatMap((e) => e.schedules);
 
   const firstEvent = project.events[0];
@@ -462,9 +489,10 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {allZones.map((z) => {
+                      {allZones.map((z, zIdx) => {
                         const avail = z.capacidad - z.vendidos;
-                        const pct = z.capacidad > 0 ? (z.vendidos / z.capacidad) * 100 : 0;
+                        const dashZone = eventDashZones[zIdx];
+                        const pct = dashZone ? dashZone.percent_sold : (z.capacidad > 0 ? (z.vendidos / z.capacidad) * 100 : 0);
                         return (
                           <tr key={z.id} className="border-b border-gray-100 last:border-0">
                             <td className="px-2 sm:px-3 py-2 font-medium text-gray-900">{z.nombre}</td>
@@ -527,6 +555,7 @@ export default function EventsPage() {
   const [projects, setProjects] = useState<ProjectDisplay[]>([]);
   const [events, setEvents] = useState<DulosEvent[]>([]);
   const [venueMap, setVenueMap] = useState<Map<string, Venue>>(new Map());
+  const [eventDashboardData, setEventDashboardData] = useState<EventDashboard[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTab, setFilterTab] = useState<FilterTab>('todos');
@@ -546,16 +575,18 @@ export default function EventsPage() {
 
   async function loadData() {
     try {
-      const [events, zones, orders, schedules, venues] = await Promise.all([
+      const [events, zones, orders, schedules, venues, dashboardData] = await Promise.all([
         fetchAllEvents().catch(() => []),
         fetchZones().catch(() => []),
         fetchAllOrders().catch(() => []),
         fetchSchedules().catch(() => []),
         getVenueMap().catch(() => new Map<string, Venue>()),
+        fetchEventDashboard().catch(() => [] as EventDashboard[]),
       ]);
 
       setVenueMap(venues);
       setEvents(events);
+      setEventDashboardData(dashboardData);
 
       // Build projects directly from events
       if (events.length > 0) {
@@ -581,7 +612,7 @@ export default function EventsPage() {
             name: event.name,
             producer: 'Francisco Paolo Dupeyron Gutierrez',
             image_url: event.image_url || '',
-            status: (isPast ? 'FINALIZADO' : event.status === 'active' ? 'PUBLISHED' : 'DRAFT') as ProjectDisplay['status'],
+            status: (isPast && event.status === 'active' ? 'completed' : (event.status || 'draft')) as ProjectDisplay['status'],
             events: [{
               id: event.id,
               name: event.name,
@@ -709,7 +740,7 @@ export default function EventsPage() {
       productor: project.producer,
       imagen_url: project.image_url,
       descripcion: '',
-      estado: project.status === 'PUBLISHED' ? 'Publicado' : 'Borrador',
+      estado: project.status === 'active' ? 'Publicado' : 'Borrador',
     });
     setEditingProjectId(project.id);
     setModalOpen(true);
@@ -737,7 +768,7 @@ export default function EventsPage() {
           toast.success('Proyecto archivado');
           setProjects((prev) =>
             prev.map((p) =>
-              p.id === archiveTarget ? { ...p, status: 'FINALIZADO' as const, isPast: true } : p
+              p.id === archiveTarget ? { ...p, status: 'completed' as const, isPast: true } : p
             )
           );
         } else {
@@ -746,7 +777,7 @@ export default function EventsPage() {
       } else {
         setProjects((prev) =>
           prev.map((p) =>
-            p.id === archiveTarget ? { ...p, status: 'FINALIZADO' as const, isPast: true } : p
+            p.id === archiveTarget ? { ...p, status: 'completed' as const, isPast: true } : p
           )
         );
         toast.success('Proyecto archivado');
@@ -853,7 +884,7 @@ export default function EventsPage() {
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-medium text-white ${getStatusColor(project.status)}`}>
-                      {project.status}
+                      {getStatusLabel(project.status)}
                     </span>
                     {project.isPast && (
                       <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:inline">{occupancy.toFixed(0)}% ocup.</span>
@@ -873,7 +904,7 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                {isExpanded && <EventDetailPanel project={project} />}
+                {isExpanded && <EventDetailPanel project={project} dashboardData={eventDashboardData} />}
               </div>
             );
           })}
