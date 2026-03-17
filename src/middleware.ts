@@ -8,17 +8,28 @@ const PUBLIC_PATHS = [
   "/_next/",
   "/favicon",
   "/api/webhooks/stripe",
+  "/api/health",
   "/dulos-logo.svg",
 ];
 
 const ALLOWED_EMAILS = ["angel.lopez@vulkn-ai.com", "tamaravulkn@gmail.com"];
+
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  response.headers.set("X-DNS-Prefetch-Control", "on");
+  return response;
+}
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Allow public paths and static files
   if (PUBLIC_PATHS.some((p) => path.startsWith(p)) || path.includes(".")) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    return addSecurityHeaders(response);
   }
 
   // Create mutable response to pass cookies through
@@ -52,19 +63,19 @@ export async function middleware(request: NextRequest) {
   if (error || !user?.email) {
     // No valid session - redirect to login
     const url = new URL("/login", request.url);
-    return NextResponse.redirect(url);
+    return addSecurityHeaders(NextResponse.redirect(url));
   }
 
   if (!ALLOWED_EMAILS.includes(user.email.toLowerCase())) {
     // Valid session but not authorized - redirect with error
     const url = new URL("/login", request.url);
     url.searchParams.set("error", "unauthorized");
-    return NextResponse.redirect(url);
+    return addSecurityHeaders(NextResponse.redirect(url));
   }
 
   // User is authenticated and authorized
   response.headers.set("X-Dulos-Security", "v7");
-  return response;
+  return addSecurityHeaders(response);
 }
 
 export const config = {

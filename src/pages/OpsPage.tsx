@@ -168,7 +168,25 @@ export default function OpsPage() {
 
   const hasNotifications = notificationLogs.length > 0
 
-  if (loading) return <div className="p-4"><div className="h-40 bg-gray-100 rounded-lg animate-pulse" /></div>
+  if (loading) return (
+    <div className="space-y-3 animate-pulse">
+      <div className="bg-gray-200 rounded-xl h-64" />
+      <div className="bg-white rounded-lg p-4 space-y-3">
+        <div className="h-4 bg-gray-200 rounded w-1/3" />
+        <div className="h-10 bg-gray-100 rounded" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-white rounded-lg p-4 space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-1/4" />
+          {[1,2,3,4,5].map(i => <div key={i} className="h-6 bg-gray-100 rounded" />)}
+        </div>
+        <div className="bg-white rounded-lg p-4 space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-1/4" />
+          {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-100 rounded" />)}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-3">
@@ -323,11 +341,14 @@ export default function OpsPage() {
                         <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-bold">
                           {customer.total_orders} boleto{customer.total_orders !== 1 ? 's' : ''}
                         </span>
-                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedCustomer === customer.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${expandedCustomer === customer.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                       </div>
                     </div>
                   </div>
-                  {expandedCustomer === customer.id && (
+                  <div
+                    className="overflow-hidden transition-all duration-300 ease-in-out"
+                    style={{ maxHeight: expandedCustomer === customer.id ? '500px' : '0px', opacity: expandedCustomer === customer.id ? 1 : 0 }}
+                  >
                     <div className="border-t border-gray-100 bg-gray-50 p-3">
                       <p className="text-xs font-bold text-gray-600 mb-2">Historial de boletos</p>
                       {(customer as any).tickets?.length > 0 ? (
@@ -362,7 +383,7 @@ export default function OpsPage() {
                         </button>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>

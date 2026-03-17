@@ -409,7 +409,7 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
   const dateRange = firstEvent?.date || '';
 
   return (
-    <div className="border-t border-gray-200 bg-[#f8f6f6] overflow-hidden transition-all">
+    <div className="border-t border-gray-200 bg-[#f8f6f6] overflow-hidden transition-all duration-300 ease-in-out animate-fade-in">
       <div className="p-4">
         <div className="flex flex-col lg:flex-row gap-5">
           {/* Left column — 40% */}

@@ -530,7 +530,7 @@ export default function FinancePage() {
 
       {/* ====== INGRESOS TAB ====== */}
       {activeTab === 'ingresos' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-fade-in">
           <FinanceScorecard data={scorecardData} currency="MXN" />
 
           {/* Revenue by Event Cards */}
@@ -639,7 +639,7 @@ export default function FinancePage() {
 
       {/* ====== CAPACIDAD TAB ====== */}
       {activeTab === 'capacidad' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-fade-in">
           <div className="section-card">
             <div className="section-card-header">
               <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -714,7 +714,7 @@ export default function FinancePage() {
 
       {/* ====== TENDENCIAS TAB ====== */}
       {activeTab === 'tendencias' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-fade-in">
           {/* Two charts side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Sales by day of week */}
@@ -807,7 +807,7 @@ export default function FinancePage() {
 
       {/* ====== TRANSACCIONES TAB ====== */}
       {activeTab === 'transacciones' && (
-        <div className="section-card">
+        <div className="section-card animate-fade-in">
           <div className="section-card-header">
             <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />

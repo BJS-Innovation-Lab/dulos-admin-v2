@@ -287,7 +287,7 @@ export default function AdminPage() {
             </div>
             <button
               onClick={() => setAuditExpanded(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all duration-300"
             >
               Ver Auditoría
             </button>
