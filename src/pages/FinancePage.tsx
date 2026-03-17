@@ -1,34 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell,
+} from 'recharts';
 import FinanceScorecard from '../components/FinanceScorecard';
 import CapacityBars from '../components/CapacityBars';
-import SalesTrend from '../components/SalesTrend';
 import {
   fetchZones,
   fetchAllOrders,
   fetchSchedules,
   fetchAllEvents,
   fetchTickets,
-  fetchTransactionHistory,
   fetchRevenueByEvent,
   DulosEvent,
   TicketZone,
   Ticket,
+  Schedule,
 } from '../lib/supabase';
 
 type TabKey = 'ingresos' | 'capacidad' | 'tendencias' | 'transacciones';
-
-interface ScorecardData {
-  revenue: number;
-  revenuePrevious: number;
-  aov: number;
-  aovPrevious: number;
-  completedOrders: number;
-  completedOrdersPrevious: number;
-  occupancyPercent: number;
-  occupancyPercentPrevious: number;
-}
+type DateRange = '7d' | '30d' | '90d' | 'all';
 
 interface ScheduleDisplay {
   name: string;
@@ -36,17 +29,7 @@ interface ScheduleDisplay {
   capacity: number;
   sold: number;
   percentage: number;
-}
-
-interface DailyData {
-  date: string;
-  amount: number;
-}
-
-interface ZoneRevenue {
-  zone: string;
-  revenue: number;
-  change: number;
+  eventId: string;
 }
 
 interface Transaction {
@@ -60,12 +43,48 @@ interface Transaction {
   status: string;
 }
 
+interface ZoneRevenue {
+  zone: string;
+  revenue: number;
+}
+
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'ingresos', label: 'Ingresos' },
   { key: 'capacidad', label: 'Capacidad' },
   { key: 'tendencias', label: 'Tendencias' },
   { key: 'transacciones', label: 'Transacciones' },
 ];
+
+const dateRangeOptions: { key: DateRange; label: string }[] = [
+  { key: '7d', label: '7d' },
+  { key: '30d', label: '30d' },
+  { key: '90d', label: '90d' },
+  { key: 'all', label: 'Todo' },
+];
+
+const ZONE_COLORS: Record<string, string> = {
+  General: '#3B82F6',
+  Dorada: '#F59E0B',
+  Preferente: '#8B5CF6',
+};
+const ZONE_COLOR_FALLBACKS = ['#3B82F6', '#F59E0B', '#8B5CF6', '#10B981', '#EF4444'];
+
+const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+
+function fmtCurrency(value: number): string {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(value);
+}
+
+function fmtShortDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' }).format(d);
+}
+
+function fmtAxisCurrency(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
+  return `$${v}`;
+}
 
 function SkeletonCard() {
   return (
@@ -77,190 +96,289 @@ function SkeletonCard() {
   );
 }
 
-export default function FinancePage() {
-  const [activeTab, setActiveTab] = useState<TabKey>('ingresos');
-  const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<string>(''); // '' means all events
-  const [events, setEvents] = useState<DulosEvent[]>([]);
-  const [zones, setZones] = useState<TicketZone[]>([]);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [eventRevenues, setEventRevenues] = useState<{ event_id: string; event_name: string; revenue: number; image_url?: string }[]>([]);
-  
-  const [scorecardData, setScorecardData] = useState<ScorecardData>({
-    revenue: 0,
-    revenuePrevious: 0,
-    aov: 0,
-    aovPrevious: 0,
-    completedOrders: 0,
-    completedOrdersPrevious: 0,
-    occupancyPercent: 0,
-    occupancyPercentPrevious: 0,
-  });
-  
-  const [schedules, setSchedules] = useState<ScheduleDisplay[]>([]);
-  const [dailyData, setDailyData] = useState<DailyData[]>([]);
-  const [zoneRevenues, setZoneRevenues] = useState<ZoneRevenue[]>([]);
-  const [capacityStats, setCapacityStats] = useState({
-    critical: 0,
-    high: 0,
-    normal: 0,
-    totalCapacity: 0,
-  });
+const PER_PAGE = 10;
 
+export default function FinancePage() {
+  // Tab & filter state
+  const [activeTab, setActiveTab] = useState<TabKey>('ingresos');
+  const [selectedEvent, setSelectedEvent] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>('all');
+  const [loading, setLoading] = useState(true);
+
+  // Raw data
+  const [events, setEvents] = useState<DulosEvent[]>([]);
+  const [rawZones, setRawZones] = useState<TicketZone[]>([]);
+  const [rawTickets, setRawTickets] = useState<Ticket[]>([]);
+  const [rawSchedules, setRawSchedules] = useState<Schedule[]>([]);
+  const [rawEventRevenues, setRawEventRevenues] = useState<{ event_id: string; event_name: string; revenue: number; image_url?: string }[]>([]);
+
+  // UI state
+  const [expandedCapacity, setExpandedCapacity] = useState<number | null>(null);
+  const [txSearch, setTxSearch] = useState('');
+  const [txSort, setTxSort] = useState<{ col: keyof Transaction; asc: boolean }>({ col: 'date', asc: false });
+  const [txPage, setTxPage] = useState(0);
+
+  // Fetch all data once
   useEffect(() => {
     async function loadData() {
       try {
-        const [zones, orders, schedulesData, eventsData, tickets, transactionHistory, revenueByEvent] = await Promise.all([
-          fetchZones().catch(() => []),
+        const [zones, _orders, schedulesData, eventsData, tickets, revenueByEvent] = await Promise.all([
+          fetchZones().catch(() => [] as TicketZone[]),
           fetchAllOrders().catch(() => []),
-          fetchSchedules().catch(() => []),
-          fetchAllEvents().catch(() => []),
-          fetchTickets().catch(() => []),
-          fetchTransactionHistory().catch(() => []),
+          fetchSchedules().catch(() => [] as Schedule[]),
+          fetchAllEvents().catch(() => [] as DulosEvent[]),
+          fetchTickets().catch(() => [] as Ticket[]),
           fetchRevenueByEvent().catch(() => []),
         ]);
-
+        setRawZones(zones);
+        setRawTickets(tickets);
+        setRawSchedules(schedulesData);
         setEvents(eventsData);
-        setEventRevenues(revenueByEvent);
-
-        // Filter data by selected event if one is selected
-        const filteredZones = selectedEvent ? zones.filter(z => z.event_id === selectedEvent) : zones;
-        const filteredOrders = selectedEvent ? orders.filter(o => o.event_id === selectedEvent) : orders;
-        const filteredSchedules = selectedEvent ? schedulesData.filter(s => s.event_id === selectedEvent) : schedulesData;
-        const filteredTickets = selectedEvent ? tickets.filter(t => t.event_id === selectedEvent) : tickets;
-
-        // Create event lookup
-        const eventMap = new Map(eventsData.map((e) => [e.id, e]));
-
-        // Transform transaction history
-        const transactionList: Transaction[] = filteredTickets.map((ticket) => {
-          const event = eventMap.get(ticket.event_id);
-          return {
-            id: ticket.ticket_number,
-            customer_name: ticket.customer_name,
-            customer_email: ticket.customer_email,
-            event_name: event?.name || ticket.event_id,
-            zone_name: ticket.zone_name,
-            amount: 0, // Amount would need to be calculated from zones
-            date: ticket.created_at,
-            status: ticket.status === 'valid' ? 'Completado' : ticket.status === 'used' ? 'Usado' : 'Pendiente'
-          };
-        }).slice(0, 100); // Limit to latest 100
-
-        setTransactions(transactionList);
-
-        // Calculate revenue from zones (sold * price)
-        const totalRevenue = filteredZones.reduce((sum, z) => sum + (z.sold * z.price), 0);
-        const totalSold = filteredZones.reduce((sum, z) => sum + z.sold, 0);
-        const totalAvailable = filteredZones.reduce((sum, z) => sum + z.available + z.sold, 0);
-        const occupancyPercent = totalAvailable > 0 ? (totalSold / totalAvailable) * 100 : 0;
-
-        // Calculate completed orders
-        const completedOrders = filteredOrders.filter((o) => o.payment_status === 'paid' || o.payment_status === 'completed').length;
-        const aov = completedOrders > 0 ? totalRevenue / completedOrders : totalSold > 0 ? totalRevenue / totalSold : 0;
-
-        setScorecardData({
-          revenue: totalRevenue,
-          revenuePrevious: totalRevenue || 1,
-          aov,
-          aovPrevious: aov || 1,
-          completedOrders: completedOrders || totalSold,
-          completedOrdersPrevious: completedOrders || totalSold || 1,
-          occupancyPercent,
-          occupancyPercentPrevious: occupancyPercent || 1,
-        });
-
-        // Group zones by zone_name for revenue breakdown
-        const zoneRevenueMap = new Map<string, number>();
-        filteredZones.forEach((z) => {
-          const current = zoneRevenueMap.get(z.zone_name) || 0;
-          zoneRevenueMap.set(z.zone_name, current + (z.sold * z.price));
-        });
-
-        const zoneRevenueArray: ZoneRevenue[] = Array.from(zoneRevenueMap.entries())
-          .map(([zone, revenue]) => ({
-            zone,
-            revenue,
-            change: 0,
-          }))
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 3);
-
-        setZoneRevenues(zoneRevenueArray);
-
-        // Build schedules for capacity view
-        const schedulesDisplay: ScheduleDisplay[] = filteredSchedules.map((s) => {
-          const event = eventMap.get(s.event_id);
-          const capacity = s.total_capacity || 0;
-          const sold = s.sold_capacity || 0;
-          const percentage = capacity > 0 ? (sold / capacity) * 100 : 0;
-
-          return {
-            name: event?.name || s.event_id,
-            date: `${s.date}T${s.start_time}`,
-            capacity,
-            sold,
-            percentage,
-          };
-        }).sort((a, b) => b.percentage - a.percentage);
-
-        setSchedules(schedulesDisplay);
-
-        // Calculate capacity stats
-        const critical = schedulesDisplay.filter((s) => s.percentage > 80).length;
-        const high = schedulesDisplay.filter((s) => s.percentage >= 50 && s.percentage <= 80).length;
-        const normal = schedulesDisplay.filter((s) => s.percentage < 50).length;
-        const totalCapacity = schedulesDisplay.reduce((sum, s) => sum + s.capacity, 0);
-
-        setCapacityStats({ critical, high, normal, totalCapacity });
-
-        // Build daily data from orders (last 7 days)
-        const now = new Date();
-        const dailyMap = new Map<string, number>();
-
-        // Initialize last 7 days with 0
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date(now);
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split('T')[0];
-          dailyMap.set(dateStr, 0);
-        }
-
-        // Sum up orders by date
-        filteredOrders.forEach((order) => {
-          if (order.purchased_at) {
-            const dateStr = order.purchased_at.split('T')[0];
-            if (dailyMap.has(dateStr)) {
-              dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + order.total_price);
-            }
-          }
-        });
-
-        const dailyArray = Array.from(dailyMap.entries()).map(([date, amount]) => ({
-          date,
-          amount,
-        }));
-
-        setDailyData(dailyArray);
-        setLoading(false);
+        setRawEventRevenues(revenueByEvent);
       } catch (error) {
         console.error('Error loading finance data:', error);
+      } finally {
         setLoading(false);
       }
     }
-
     loadData();
-  }, [selectedEvent]); // Reload when event filter changes
+  }, []);
+
+  // Compute all derived data
+  const computed = useMemo(() => {
+    if (loading) return null;
+
+    const eventMap = new Map(events.map(e => [e.id, e]));
+
+    // Zone price lookup
+    const zonePriceMap = new Map<string, number>();
+    rawZones.forEach(z => {
+      zonePriceMap.set(`${z.event_id}:${z.zone_name}`, z.price);
+    });
+
+    // Date cutoff
+    let cutoff: Date | null = null;
+    if (dateRange !== 'all') {
+      cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - (dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90));
+    }
+
+    // Filter zones & tickets by event
+    const filteredZones = selectedEvent ? rawZones.filter(z => z.event_id === selectedEvent) : rawZones;
+    const eventFilteredTickets = selectedEvent ? rawTickets.filter(t => t.event_id === selectedEvent) : rawTickets;
+
+    // Filter tickets by date
+    const filteredTickets = cutoff
+      ? eventFilteredTickets.filter(t => new Date(t.created_at) >= cutoff!)
+      : eventFilteredTickets;
+
+    // Filter schedules by event
+    const filteredSchedules = selectedEvent ? rawSchedules.filter(s => s.event_id === selectedEvent) : rawSchedules;
+
+    // Event revenues (filtered by event if needed)
+    const eventRevenues = selectedEvent
+      ? rawEventRevenues.filter(r => r.event_id === selectedEvent)
+      : rawEventRevenues;
+
+    // --- Scorecard ---
+    const totalRevenue = filteredZones.reduce((sum, z) => sum + z.sold * z.price, 0);
+    const totalSold = filteredZones.reduce((sum, z) => sum + z.sold, 0);
+    const totalAvailable = filteredZones.reduce((sum, z) => sum + z.available + z.sold, 0);
+    const occupancyPercent = totalAvailable > 0 ? (totalSold / totalAvailable) * 100 : 0;
+    const aov = totalSold > 0 ? totalRevenue / totalSold : 0;
+
+    const scorecardData = {
+      revenue: totalRevenue,
+      revenuePrevious: totalRevenue || 1,
+      aov,
+      aovPrevious: aov || 1,
+      completedOrders: totalSold,
+      completedOrdersPrevious: totalSold || 1,
+      occupancyPercent,
+      occupancyPercentPrevious: occupancyPercent || 1,
+    };
+
+    // --- Zone revenues ---
+    const zoneRevenueMap = new Map<string, number>();
+    filteredZones.forEach(z => {
+      zoneRevenueMap.set(z.zone_name, (zoneRevenueMap.get(z.zone_name) || 0) + z.sold * z.price);
+    });
+    const zoneRevenues: ZoneRevenue[] = Array.from(zoneRevenueMap.entries())
+      .map(([zone, revenue]) => ({ zone, revenue }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // Donut data
+    const donutData = zoneRevenues.map((z, i) => ({
+      name: z.zone,
+      value: z.revenue,
+      color: ZONE_COLORS[z.zone] || ZONE_COLOR_FALLBACKS[i % ZONE_COLOR_FALLBACKS.length],
+    }));
+    const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
+
+    // --- Daily revenue chart (from tickets) ---
+    const dailyMap = new Map<string, number>();
+    filteredTickets.forEach(t => {
+      const dateStr = t.created_at.split('T')[0];
+      const price = zonePriceMap.get(`${t.event_id}:${t.zone_name}`) || 0;
+      dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + price);
+    });
+    const dailyRevenueData = Array.from(dailyMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, amount]) => ({ date, label: fmtShortDate(date), amount }));
+
+    // --- Schedules for capacity ---
+    const schedulesDisplay: ScheduleDisplay[] = filteredSchedules.map(s => {
+      const event = eventMap.get(s.event_id);
+      const capacity = s.total_capacity || 0;
+      const sold = s.sold_capacity || 0;
+      const percentage = capacity > 0 ? (sold / capacity) * 100 : 0;
+      return {
+        name: event?.name || s.event_id,
+        date: `${s.date}T${s.start_time}`,
+        capacity,
+        sold,
+        percentage,
+        eventId: s.event_id,
+      };
+    }).sort((a, b) => b.percentage - a.percentage);
+
+    // Zone breakdown per event for capacity expansion
+    const zonesByEvent: Record<string, { zone_name: string; sold: number; total: number; percentage: number }[]> = {};
+    const zoneEventMap = new Map<string, Map<string, { sold: number; available: number }>>();
+    rawZones.forEach(z => {
+      if (!zoneEventMap.has(z.event_id)) zoneEventMap.set(z.event_id, new Map());
+      const em = zoneEventMap.get(z.event_id)!;
+      const existing = em.get(z.zone_name) || { sold: 0, available: 0 };
+      existing.sold += z.sold;
+      existing.available += z.available;
+      em.set(z.zone_name, existing);
+    });
+    zoneEventMap.forEach((zones, eventId) => {
+      zonesByEvent[eventId] = Array.from(zones.entries()).map(([zone_name, data]) => {
+        const total = data.sold + data.available;
+        return { zone_name, sold: data.sold, total, percentage: total > 0 ? (data.sold / total) * 100 : 0 };
+      }).sort((a, b) => b.percentage - a.percentage);
+    });
+
+    // Capacity stats
+    const critical = schedulesDisplay.filter(s => s.percentage > 80).length;
+    const high = schedulesDisplay.filter(s => s.percentage >= 50 && s.percentage <= 80).length;
+    const normal = schedulesDisplay.filter(s => s.percentage < 50).length;
+    const totalCapacity = schedulesDisplay.reduce((sum, s) => sum + s.capacity, 0);
+    const capacityStats = { critical, high, normal, totalCapacity };
+
+    // --- Transactions ---
+    const transactions: Transaction[] = filteredTickets.map(ticket => {
+      const event = eventMap.get(ticket.event_id);
+      const price = zonePriceMap.get(`${ticket.event_id}:${ticket.zone_name}`) || 0;
+      return {
+        id: ticket.ticket_number,
+        customer_name: ticket.customer_name,
+        customer_email: ticket.customer_email,
+        event_name: event?.name || ticket.event_id,
+        zone_name: ticket.zone_name,
+        amount: price,
+        date: ticket.created_at,
+        status: ticket.status === 'valid' ? 'Completado' : ticket.status === 'used' ? 'Usado' : ticket.status === 'refunded' ? 'Reembolsado' : 'Pendiente',
+      };
+    });
+
+    // --- Tendencias: Sales by day of week ---
+    const dayOfWeekTotals = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
+    filteredTickets.forEach(t => {
+      const day = new Date(t.created_at).getDay();
+      const price = zonePriceMap.get(`${t.event_id}:${t.zone_name}`) || 0;
+      dayOfWeekTotals[day] += price;
+    });
+    // Reorder to Mon-Sun
+    const dayOfWeekData = [1, 2, 3, 4, 5, 6, 0].map(i => ({
+      day: DAY_NAMES[i],
+      sales: dayOfWeekTotals[i],
+    }));
+
+    // --- Tendencias: Occupancy by event ---
+    const eventOccupancy: { name: string; occupancy: number; image_url?: string }[] = [];
+    const eventZoneAgg = new Map<string, { sold: number; total: number }>();
+    rawZones.forEach(z => {
+      const agg = eventZoneAgg.get(z.event_id) || { sold: 0, total: 0 };
+      agg.sold += z.sold;
+      agg.total += z.sold + z.available;
+      eventZoneAgg.set(z.event_id, agg);
+    });
+    eventZoneAgg.forEach((agg, eventId) => {
+      const event = eventMap.get(eventId);
+      if (event) {
+        eventOccupancy.push({
+          name: event.name.length > 20 ? event.name.substring(0, 20) + '...' : event.name,
+          occupancy: agg.total > 0 ? Math.round((agg.sold / agg.total) * 100) : 0,
+          image_url: event.image_url,
+        });
+      }
+    });
+    eventOccupancy.sort((a, b) => b.occupancy - a.occupancy);
+
+    // --- Tendencias: Summary stats ---
+    const bestDayIdx = dayOfWeekTotals.indexOf(Math.max(...dayOfWeekTotals));
+    const bestDay = DAY_NAMES[bestDayIdx];
+    const avgTicketPrice = filteredTickets.length > 0
+      ? filteredTickets.reduce((sum, t) => sum + (zonePriceMap.get(`${t.event_id}:${t.zone_name}`) || 0), 0) / filteredTickets.length
+      : 0;
+
+    // Most popular event by ticket count
+    const eventTicketCount = new Map<string, number>();
+    filteredTickets.forEach(t => {
+      eventTicketCount.set(t.event_id, (eventTicketCount.get(t.event_id) || 0) + 1);
+    });
+    let popularEventId = '';
+    let popularEventCount = 0;
+    eventTicketCount.forEach((count, eid) => {
+      if (count > popularEventCount) { popularEventId = eid; popularEventCount = count; }
+    });
+    const popularEvent = eventMap.get(popularEventId)?.name || '-';
+
+    // Most popular zone
+    const zoneTicketCount = new Map<string, number>();
+    filteredTickets.forEach(t => {
+      zoneTicketCount.set(t.zone_name, (zoneTicketCount.get(t.zone_name) || 0) + 1);
+    });
+    let popularZone = '-';
+    let popularZoneCount = 0;
+    zoneTicketCount.forEach((count, name) => {
+      if (count > popularZoneCount) { popularZone = name; popularZoneCount = count; }
+    });
+
+    const summaryStats = { bestDay, avgTicketPrice, popularEvent, popularZone };
+
+    return {
+      scorecardData,
+      eventRevenues,
+      zoneRevenues,
+      donutData,
+      donutTotal,
+      dailyRevenueData,
+      schedulesDisplay,
+      zonesByEvent,
+      capacityStats,
+      transactions,
+      dayOfWeekData,
+      eventOccupancy,
+      summaryStats,
+    };
+  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, selectedEvent, dateRange]);
+
+  // Reset txPage when filters change
+  useEffect(() => { setTxPage(0); }, [selectedEvent, dateRange, txSearch, txSort]);
 
   const exportCSV = () => {
+    if (!computed) return;
     const rows = [
-      ['Metrica', 'Valor Actual', 'Valor Anterior', 'Cambio %'],
-      ['Ingresos', scorecardData.revenue.toString(), scorecardData.revenuePrevious.toString(), `${((scorecardData.revenue - scorecardData.revenuePrevious) / scorecardData.revenuePrevious * 100).toFixed(1)}%`],
-      ['AOV', scorecardData.aov.toFixed(0), scorecardData.aovPrevious.toFixed(0), `${((scorecardData.aov - scorecardData.aovPrevious) / scorecardData.aovPrevious * 100).toFixed(1)}%`],
-      ['Ordenes Completadas', scorecardData.completedOrders.toString(), scorecardData.completedOrdersPrevious.toString(), `${((scorecardData.completedOrders - scorecardData.completedOrdersPrevious) / scorecardData.completedOrdersPrevious * 100).toFixed(1)}%`],
-      ['Ocupacion %', scorecardData.occupancyPercent.toFixed(1), scorecardData.occupancyPercentPrevious.toFixed(1), `${(scorecardData.occupancyPercent - scorecardData.occupancyPercentPrevious).toFixed(1)}%`],
-      ...zoneRevenues.map((z) => [z.zone, z.revenue.toString(), '-', '-']),
+      ['Metrica', 'Valor'],
+      ['Ingresos Totales', computed.scorecardData.revenue.toString()],
+      ['AOV', computed.scorecardData.aov.toFixed(0)],
+      ['Ordenes Completadas', computed.scorecardData.completedOrders.toString()],
+      ['Ocupacion %', computed.scorecardData.occupancyPercent.toFixed(1)],
+      ...computed.zoneRevenues.map(z => [z.zone, z.revenue.toString()]),
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -272,41 +390,114 @@ export default function FinancePage() {
     URL.revokeObjectURL(url);
   };
 
+  // Transaction filtering, sorting, pagination
+  const processedTransactions = useMemo(() => {
+    if (!computed) return { items: [] as Transaction[], total: 0 };
+    let items = computed.transactions;
+
+    // Search
+    if (txSearch) {
+      const q = txSearch.toLowerCase();
+      items = items.filter(t =>
+        t.id.toLowerCase().includes(q) ||
+        t.customer_name.toLowerCase().includes(q) ||
+        t.customer_email.toLowerCase().includes(q) ||
+        t.event_name.toLowerCase().includes(q) ||
+        t.zone_name.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    items = [...items].sort((a, b) => {
+      const col = txSort.col;
+      const va = a[col];
+      const vb = b[col];
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      return txSort.asc ? cmp : -cmp;
+    });
+
+    const total = items.length;
+    const start = txPage * PER_PAGE;
+    items = items.slice(start, start + PER_PAGE);
+
+    return { items, total };
+  }, [computed, txSearch, txSort, txPage]);
+
+  const toggleSort = (col: keyof Transaction) => {
+    setTxSort(prev => prev.col === col ? { col, asc: !prev.asc } : { col, asc: true });
+  };
+
+  const SortHeader = ({ col, label }: { col: keyof Transaction; label: string }) => (
+    <th
+      className="text-left py-3 px-3 font-bold text-white text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors"
+      onClick={() => toggleSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {txSort.col === col && (
+          <svg className={`w-3 h-3 transition-transform ${txSort.asc ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20">
+            <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+          </svg>
+        )}
+      </span>
+    </th>
+  );
+
   if (loading) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
         </div>
       </div>
     );
   }
 
+  if (!computed) return null;
+
+  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats } = computed;
+
   return (
     <div className="space-y-4">
-      {/* Page Header with Event Filter and Export */}
-      <div className="flex justify-between items-center">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-extrabold text-gray-900">Panel Financiero</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Metricas de ingresos, capacidad y tendencias
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Metricas de ingresos, capacidad y tendencias</p>
         </div>
-        <div className="flex gap-3">
-          {/* Event Filter Dropdown */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date range presets */}
+          <div className="flex rounded-lg overflow-hidden border border-gray-200">
+            {dateRangeOptions.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setDateRange(opt.key)}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  dateRange === opt.key
+                    ? 'bg-[#1E293B] text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Event dropdown */}
           <select
             value={selectedEvent}
-            onChange={(e) => setSelectedEvent(e.target.value)}
+            onChange={e => setSelectedEvent(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]"
           >
             <option value="">Todos los Eventos</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
+            {events.map(event => (
+              <option key={event.id} value={event.id}>{event.name}</option>
             ))}
           </select>
-          
+
+          {/* Export */}
           <button
             onClick={exportCSV}
             className="px-4 py-2 bg-[#E63946] text-white rounded-lg text-sm font-medium hover:bg-[#c5303c] transition-colors flex items-center gap-2"
@@ -321,27 +512,23 @@ export default function FinancePage() {
 
       {/* Sub-tabs */}
       <div className="section-card">
-        <div className="flex gap-6 px-5 border-b border-gray-100">
-          {tabs.map((tab) => (
+        <div className="flex gap-6 px-5 border-b border-gray-100 overflow-x-auto">
+          {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`relative py-4 text-sm font-bold whitespace-nowrap transition-all ${
-                activeTab === tab.key
-                  ? 'text-[#E63946]'
-                  : 'text-gray-500 hover:text-gray-800'
+                activeTab === tab.key ? 'text-[#E63946]' : 'text-gray-500 hover:text-gray-800'
               }`}
             >
               {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#E63946]" />
-              )}
+              {activeTab === tab.key && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#E63946]" />}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Content */}
+      {/* ====== INGRESOS TAB ====== */}
       {activeTab === 'ingresos' && (
         <div className="space-y-4">
           <FinanceScorecard data={scorecardData} currency="MXN" />
@@ -356,33 +543,26 @@ export default function FinancePage() {
             </div>
             <div className="section-card-body">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {eventRevenues.length > 0 ? eventRevenues.slice(0, 6).map((event) => (
+                {eventRevenues.length > 0 ? eventRevenues.slice(0, 6).map(event => (
                   <div key={event.event_id} className="p-3 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
                       {event.image_url && (
-                        <img 
-                          src={event.image_url} 
-                          alt={event.event_name} 
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
+                        <img src={event.image_url} alt={event.event_name} className="w-12 h-12 rounded-lg object-cover" />
                       )}
                       <div className="flex-1">
                         <p className="font-bold text-sm text-gray-900">{event.event_name}</p>
-                        <p className="text-lg font-extrabold text-[#E63946]">
-                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(event.revenue)}
-                        </p>
+                        <p className="text-lg font-extrabold text-[#E63946]">{fmtCurrency(event.revenue)}</p>
                       </div>
                     </div>
                   </div>
                 )) : (
-                  <div className="col-span-3 text-center text-gray-500 py-4 text-sm">
-                    No hay datos de eventos disponibles
-                  </div>
+                  <div className="col-span-3 text-center text-gray-500 py-4 text-sm">No hay datos de eventos disponibles</div>
                 )}
               </div>
             </div>
           </div>
 
+          {/* Resumen por Zona + Donut */}
           <div className="section-card">
             <div className="section-card-header">
               <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,93 +571,87 @@ export default function FinancePage() {
               <span className="section-card-title">Resumen de Ingresos por Zona</span>
             </div>
             <div className="section-card-body">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {zoneRevenues.length > 0 ? zoneRevenues.map((z) => (
-                  <div key={z.zone} className="metric-card">
-                    <p className="metric-card-title">{z.zone}</p>
-                    <p className="metric-card-value">
-                      {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(z.revenue)}
-                    </p>
-                    <p className="metric-card-subtitle text-gray-400">
-                      Ingresos acumulados
-                    </p>
-                  </div>
-                )) : (
-                  <div className="col-span-3 text-center text-gray-500 py-4 text-sm">
-                    No hay datos de zonas disponibles
+              <div className="flex flex-col lg:flex-row gap-5 items-start">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 w-full">
+                  {zoneRevenues.length > 0 ? zoneRevenues.slice(0, 3).map(z => (
+                    <div key={z.zone} className="metric-card">
+                      <p className="metric-card-title">{z.zone}</p>
+                      <p className="metric-card-value">{fmtCurrency(z.revenue)}</p>
+                      <p className="metric-card-subtitle text-gray-400">Ingresos acumulados</p>
+                    </div>
+                  )) : (
+                    <div className="col-span-3 text-center text-gray-500 py-4 text-sm">No hay datos de zonas disponibles</div>
+                  )}
+                </div>
+                {/* Donut chart */}
+                {donutData.length > 0 && (
+                  <div className="flex-shrink-0 flex flex-col items-center">
+                    <div className="relative">
+                      <PieChart width={150} height={150}>
+                        <Pie
+                          data={donutData}
+                          cx={75}
+                          cy={75}
+                          innerRadius={45}
+                          outerRadius={65}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {donutData.map((entry, i) => (
+                            <Cell key={i} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v) => fmtCurrency(Number(v))} />
+                      </PieChart>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="text-xs font-bold text-gray-700">{fmtCurrency(donutTotal)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-3 mt-2">
+                      {donutData.map(d => (
+                        <span key={d.name} className="flex items-center gap-1 text-xs text-gray-600">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                          {d.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {activeTab === 'transacciones' && (
-        <div className="section-card">
-          <div className="section-card-header">
-            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            <span className="section-card-title">Historial de Transacciones</span>
-            <span className="ml-auto text-sm text-gray-500">{transactions.length} registros</span>
-          </div>
-          <div className="section-card-body p-0">
-            <div className="max-h-96 overflow-y-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="text-left py-2 px-3 font-bold text-gray-600 text-[13px]">Ticket</th>
-                    <th className="text-left py-2 px-3 font-bold text-gray-600 text-[13px]">Cliente</th>
-                    <th className="text-left py-2 px-3 font-bold text-gray-600 text-[13px]">Evento</th>
-                    <th className="text-left py-2 px-3 font-bold text-gray-600 text-[13px]">Zona</th>
-                    <th className="text-left py-2 px-3 font-bold text-gray-600 text-[13px]">Fecha</th>
-                    <th className="text-center py-2 px-3 font-bold text-gray-600 text-[13px]">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.length > 0 ? transactions.map((transaction, index) => (
-                    <tr key={transaction.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-1.5 px-3 text-[13px] font-mono text-[#E63946] font-bold">{transaction.id}</td>
-                      <td className="py-1.5 px-3 text-[13px]">
-                        <div>
-                          <div className="font-bold">{transaction.customer_name}</div>
-                          <div className="text-gray-500 text-xs">{transaction.customer_email}</div>
-                        </div>
-                      </td>
-                      <td className="py-1.5 px-3 text-[13px] text-gray-600">{transaction.event_name}</td>
-                      <td className="py-1.5 px-3 text-[13px] text-gray-600">{transaction.zone_name}</td>
-                      <td className="py-1.5 px-3 text-[13px] text-gray-500">
-                        {new Date(transaction.date).toLocaleString('es-MX', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="py-1.5 px-3 text-center">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold text-white ${
-                          transaction.status === 'Completado' ? 'bg-green-500' :
-                          transaction.status === 'Usado' ? 'bg-blue-500' : 'bg-yellow-500'
-                        }`}>
-                          {transaction.status}
-                        </span>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-gray-500 text-sm">
-                        No hay transacciones disponibles
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* Daily Revenue Area Chart */}
+          {dailyRevenueData.length > 0 && (
+            <div className="section-card">
+              <div className="section-card-header">
+                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+                <span className="section-card-title">Ingresos Diarios</span>
+              </div>
+              <div className="section-card-body">
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={dailyRevenueData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
+                    <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ingresos']} />
+                    <Area type="monotone" dataKey="amount" stroke="#EF4444" fill="url(#revenueGrad)" strokeWidth={2} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
+      {/* ====== CAPACIDAD TAB ====== */}
       {activeTab === 'capacidad' && (
         <div className="space-y-4">
           <div className="section-card">
@@ -485,31 +659,33 @@ export default function FinancePage() {
               <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-              <span className="section-card-title">Ocupación por Función</span>
+              <span className="section-card-title">Ocupacion por Funcion</span>
               <div className="flex gap-4 text-xs ml-auto">
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                  Crítico (&gt;80%)
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500" />Critico (&gt;80%)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
-                  Alto (50-80%)
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />Alto (50-80%)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                  Normal (&lt;50%)
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" />Normal (&lt;50%)
                 </span>
               </div>
             </div>
           </div>
 
-          <CapacityBars schedules={schedules} />
+          <CapacityBars
+            schedules={schedulesDisplay}
+            zonesByEvent={zonesByEvent}
+            expandedIndex={expandedCapacity}
+            onToggle={(index) => setExpandedCapacity(prev => prev === index ? null : index)}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="metric-card">
-              <p className="metric-card-title">Eventos Críticos</p>
+              <p className="metric-card-title">Eventos Criticos</p>
               <p className="metric-card-value text-red-500">{capacityStats.critical}</p>
-              <p className="metric-card-subtitle">Ocupación &gt;80%</p>
+              <p className="metric-card-subtitle">Ocupacion &gt;80%</p>
               <div className="metric-card-icon bg-red-100">
                 <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -517,7 +693,7 @@ export default function FinancePage() {
               </div>
             </div>
             <div className="metric-card">
-              <p className="metric-card-title">Ocupación Alta</p>
+              <p className="metric-card-title">Ocupacion Alta</p>
               <p className="metric-card-value text-amber-500">{capacityStats.high}</p>
               <p className="metric-card-subtitle">Entre 50-80%</p>
               <div className="metric-card-icon bg-amber-100">
@@ -527,7 +703,7 @@ export default function FinancePage() {
               </div>
             </div>
             <div className="metric-card">
-              <p className="metric-card-title">Ocupación Normal</p>
+              <p className="metric-card-title">Ocupacion Normal</p>
               <p className="metric-card-value text-emerald-500">{capacityStats.normal}</p>
               <p className="metric-card-subtitle">&lt;50% ocupado</p>
               <div className="metric-card-icon bg-emerald-100">
@@ -550,94 +726,197 @@ export default function FinancePage() {
         </div>
       )}
 
+      {/* ====== TENDENCIAS TAB ====== */}
       {activeTab === 'tendencias' && (
         <div className="space-y-4">
-          <SalesTrend dailyData={dailyData} />
-
+          {/* Two charts side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Sales by day of week */}
             <div className="section-card">
               <div className="section-card-header">
-                <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-                <span className="section-card-title">Mejores Días de Venta</span>
-              </div>
-              <div className="section-card-body">
-                <div className="space-y-3">
-                  {[...dailyData]
-                    .sort((a, b) => b.amount - a.amount)
-                    .slice(0, 3)
-                    .map((day, index) => (
-                      <div
-                        key={day.date}
-                        className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-extrabold text-sm ${
-                              index === 0
-                                ? 'bg-[#E63946]'
-                                : index === 1
-                                ? 'bg-gray-400'
-                                : 'bg-amber-600'
-                            }`}
-                          >
-                            {index + 1}
-                          </span>
-                          <span className="font-bold text-gray-900 text-sm">
-                            {new Intl.DateTimeFormat('es-MX', {
-                              weekday: 'long',
-                              day: 'numeric',
-                              month: 'short',
-                            }).format(new Date(day.date))}
-                          </span>
-                        </div>
-                        <span className="font-extrabold text-gray-900">
-                          {new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN',
-                            minimumFractionDigits: 0,
-                          }).format(day.amount)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="section-card">
-              <div className="section-card-header">
-                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span className="section-card-title">Proyección Semanal</span>
+                <span className="section-card-title">Ventas por Dia de la Semana</span>
               </div>
-              <div className="section-card-body space-y-4">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-sm text-gray-500">Meta semanal</p>
-                    <p className="text-2xl font-extrabold text-gray-900">
-                      {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(scorecardData.revenue * 1.1)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-500">Alcanzado</p>
-                    <p className="text-2xl font-extrabold text-[#E63946]">
-                      {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(scorecardData.revenue)}
-                    </p>
-                  </div>
-                </div>
-                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#E63946] rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(90.9, 100)}%` }}
-                  />
-                </div>
-                <p className="text-center text-sm text-gray-600">
-                  <span className="font-extrabold text-[#E63946]">90.9%</span> de la meta alcanzada
-                </p>
+              <div className="section-card-body">
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={dayOfWeekData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                    <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
+                    <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ventas']} />
+                    <Bar dataKey="sales" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
+
+            {/* Occupancy by event */}
+            <div className="section-card">
+              <div className="section-card-header">
+                <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="section-card-title">Ocupacion Promedio por Evento</span>
+              </div>
+              <div className="section-card-body">
+                {eventOccupancy.length > 0 ? (
+                  <div className="space-y-3">
+                    {eventOccupancy.map((ev, i) => {
+                      const barColor = ev.occupancy > 80 ? 'bg-[#E63946]' : ev.occupancy >= 50 ? 'bg-yellow-500' : 'bg-green-500';
+                      return (
+                        <div key={i} className="flex items-center gap-3">
+                          {ev.image_url ? (
+                            <img src={ev.image_url} alt={ev.name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-6 h-6 rounded bg-gray-200 flex-shrink-0" />
+                          )}
+                          <span className="text-sm text-gray-700 w-36 truncate flex-shrink-0">{ev.name}</span>
+                          <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(ev.occupancy, 100)}%` }} />
+                          </div>
+                          <span className="text-sm font-bold text-gray-900 w-12 text-right">{ev.occupancy}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 text-sm py-4">No hay datos disponibles</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary card */}
+          <div className="section-card">
+            <div className="section-card-header">
+              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+              <span className="section-card-title">Resumen</span>
+            </div>
+            <div className="section-card-body">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Mejor dia de venta</p>
+                  <p className="text-lg font-extrabold text-gray-900">{summaryStats.bestDay}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Precio promedio de ticket</p>
+                  <p className="text-lg font-extrabold text-gray-900">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Evento mas popular</p>
+                  <p className="text-lg font-extrabold text-gray-900 truncate">{summaryStats.popularEvent}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Zona mas popular</p>
+                  <p className="text-lg font-extrabold text-gray-900">{summaryStats.popularZone}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====== TRANSACCIONES TAB ====== */}
+      {activeTab === 'transacciones' && (
+        <div className="section-card">
+          <div className="section-card-header">
+            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            <span className="section-card-title">Historial de Transacciones</span>
+            <span className="ml-auto text-sm text-gray-500">{processedTransactions.total} registros</span>
+          </div>
+
+          {/* Search bar */}
+          <div className="px-5 py-3 border-b border-gray-100">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Buscar por ticket, cliente, evento..."
+                value={txSearch}
+                onChange={e => setTxSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]"
+              />
+            </div>
+          </div>
+
+          <div className="section-card-body p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-[#1E293B]">
+                  <tr>
+                    <SortHeader col="id" label="ID" />
+                    <SortHeader col="date" label="Fecha" />
+                    <SortHeader col="customer_name" label="Cliente" />
+                    <SortHeader col="event_name" label="Evento" />
+                    <SortHeader col="zone_name" label="Zona" />
+                    <SortHeader col="amount" label="Monto" />
+                    <SortHeader col="status" label="Estado" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {processedTransactions.items.length > 0 ? processedTransactions.items.map(tx => (
+                    <tr key={tx.id} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-3 text-[13px] font-mono text-[#E63946] font-bold">{tx.id}</td>
+                      <td className="py-2 px-3 text-[13px] text-gray-500 whitespace-nowrap">
+                        {new Date(tx.date).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2 px-3 text-[13px]">
+                        <div className="font-bold">{tx.customer_name}</div>
+                        <div className="text-gray-500 text-xs">{tx.customer_email}</div>
+                      </td>
+                      <td className="py-2 px-3 text-[13px] text-gray-600">{tx.event_name}</td>
+                      <td className="py-2 px-3 text-[13px] text-gray-600">{tx.zone_name}</td>
+                      <td className="py-2 px-3 text-[13px] font-bold text-gray-900">{fmtCurrency(tx.amount)}</td>
+                      <td className="py-2 px-3 text-center">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold text-white ${
+                          tx.status === 'Completado' ? 'bg-green-500' :
+                          tx.status === 'Reembolsado' ? 'bg-red-500' :
+                          tx.status === 'Usado' ? 'bg-blue-500' : 'bg-yellow-500'
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500 text-sm">No hay transacciones disponibles</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {processedTransactions.total > PER_PAGE && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+                <span className="text-sm text-gray-500">
+                  {txPage * PER_PAGE + 1}-{Math.min((txPage + 1) * PER_PAGE, processedTransactions.total)} de {processedTransactions.total}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTxPage(p => Math.max(0, p - 1))}
+                    disabled={txPage === 0}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    onClick={() => setTxPage(p => p + 1)}
+                    disabled={(txPage + 1) * PER_PAGE >= processedTransactions.total}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
