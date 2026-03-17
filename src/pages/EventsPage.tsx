@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
+import { toast } from 'sonner';
 import {
   fetchAllEvents,
   fetchZones,
@@ -12,6 +13,7 @@ import {
   Order,
   Schedule,
 } from '../lib/supabase';
+import { createEvent, updateEvent, archiveEvent } from '../app/actions/events.actions';
 
 /* ─── Types ─── */
 
@@ -118,13 +120,11 @@ const mapPaymentStatus = (status: string): OrderDisplay['estado'] => {
 
 const isPastDate = (dateStr: string): boolean => {
   if (!dateStr) return false;
-  // Try to extract a date-like pattern from the string
   const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
     const d = new Date(match[0]);
     return d < new Date();
   }
-  // Try parsing as-is
   const d = new Date(dateStr);
   if (!isNaN(d.getTime())) return d < new Date();
   return false;
@@ -155,21 +155,6 @@ function SkeletonRow() {
   );
 }
 
-/* ─── Toast ─── */
-
-function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium transition-all ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-      {message}
-    </div>
-  );
-}
-
 /* ─── Project Modal ─── */
 
 function ProjectModal({
@@ -177,11 +162,13 @@ function ProjectModal({
   onClose,
   onSubmit,
   initialData,
+  submitting,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: ProjectFormData) => void;
   initialData?: ProjectFormData | null;
+  submitting?: boolean;
 }) {
   const [form, setForm] = useState<ProjectFormData>({
     nombre: '',
@@ -295,8 +282,15 @@ function ProjectModal({
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-[#E63946] px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#c5303c]"
+            disabled={submitting}
+            className="w-full rounded-lg bg-[#E63946] px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#c5303c] disabled:opacity-50 flex items-center justify-center gap-2"
           >
+            {submitting && (
+              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
             {initialData ? 'Guardar Cambios' : 'Crear Proyecto'}
           </button>
         </form>
@@ -393,15 +387,12 @@ function ActionsMenu({
 /* ─── Inline Detail Panel ─── */
 
 function EventDetailPanel({ project }: { project: ProjectDisplay }) {
-  // Aggregate across all events in the project
   const totalRevenue = project.events.reduce((s, e) => s + e.revenue, 0);
   const totalSold = project.events.reduce((s, e) => s + e.ticketsSold, 0);
   const totalCapacity = project.events.reduce((s, e) => s + e.totalTickets, 0);
   const occupancy = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
 
-  // Merge all zones across events
   const allZones = project.events.flatMap((e) => e.zones);
-  // Merge all schedules across events
   const allSchedules = project.events.flatMap((e) => e.schedules);
 
   const firstEvent = project.events[0];
@@ -412,7 +403,6 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
     <div className="border-t border-gray-200 bg-[#f8f6f6] overflow-hidden transition-all duration-300 ease-in-out animate-fade-in">
       <div className="p-4">
         <div className="flex flex-col lg:flex-row gap-5">
-          {/* Left column — 40% */}
           <div className="lg:w-[40%] flex-shrink-0">
             {project.image_url ? (
               <img
@@ -430,9 +420,7 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
             <p className="text-sm text-gray-500">{formatDate(dateRange)}</p>
           </div>
 
-          {/* Right column — 60% */}
           <div className="lg:w-[60%] space-y-4">
-            {/* Mini KPIs */}
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl bg-white border border-gray-200 p-3 text-center">
                 <p className="text-xs text-gray-500 mb-1">Revenue</p>
@@ -448,7 +436,6 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
               </div>
             </div>
 
-            {/* Zones table */}
             {allZones.length > 0 && (
               <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -488,7 +475,6 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
               </div>
             )}
 
-            {/* Schedules list */}
             {allSchedules.length > 0 && (
               <div className="rounded-xl bg-white border border-gray-200 p-3">
                 <h4 className="font-bold text-gray-900 text-sm mb-2">Funciones</h4>
@@ -536,12 +522,10 @@ export default function EventsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectFormData | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Confirm dialog
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
-
-  // Toast
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -631,7 +615,6 @@ export default function EventsPage() {
           };
         });
 
-        // Determine if past based on latest event date
         const allPast = projectEvents.every((e) => isPastDate(e.dates));
 
         const status: ProjectDisplay['status'] = allPast
@@ -686,20 +669,63 @@ export default function EventsPage() {
     return { totalRevenue, eventCount, occupancy };
   };
 
-  const handleCreateSubmit = (data: ProjectFormData) => {
-    console.log('Create project:', data);
-    setModalOpen(false);
-    setEditingProject(null);
-    setEditingProjectId(null);
-    setToast({ message: 'Proyecto creado exitosamente', type: 'success' });
+  const handleCreateSubmit = async (data: ProjectFormData) => {
+    setSubmitting(true);
+    try {
+      const result = await createEvent({
+        name: data.nombre,
+        producer: data.productor,
+        image_url: data.imagen_url,
+        description: data.descripcion,
+        status: data.estado === 'Publicado' ? 'active' : 'draft',
+      });
+      if (result.success) {
+        toast.success('Evento creado exitosamente');
+        setModalOpen(false);
+        setEditingProject(null);
+        setEditingProjectId(null);
+        loadData();
+      } else {
+        toast.error(result.error || 'Error al crear el evento');
+      }
+    } catch {
+      toast.error('Error al crear el evento');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleEditSubmit = (data: ProjectFormData) => {
-    console.log('Edit project:', editingProjectId, data);
-    setModalOpen(false);
-    setEditingProject(null);
-    setEditingProjectId(null);
-    setToast({ message: 'Proyecto actualizado exitosamente', type: 'success' });
+  const handleEditSubmit = async (data: ProjectFormData) => {
+    if (!editingProjectId) return;
+    setSubmitting(true);
+    try {
+      const project = projects.find(p => p.id === editingProjectId);
+      const eventId = project?.events[0]?.id;
+      if (eventId) {
+        const result = await updateEvent(eventId, {
+          name: data.nombre,
+          producer: data.productor,
+          image_url: data.imagen_url,
+          description: data.descripcion,
+          status: data.estado === 'Publicado' ? 'active' : 'draft',
+        });
+        if (result.success) {
+          toast.success('Proyecto actualizado exitosamente');
+          setModalOpen(false);
+          setEditingProject(null);
+          setEditingProjectId(null);
+          loadData();
+        } else {
+          toast.error(result.error || 'Error al actualizar');
+        }
+      } else {
+        toast.error('No se encontró el evento');
+      }
+    } catch {
+      toast.error('Error al actualizar el proyecto');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (project: ProjectDisplay) => {
@@ -726,25 +752,32 @@ export default function EventsPage() {
     setModalOpen(true);
   };
 
-  const handleArchiveConfirm = () => {
+  const handleArchiveConfirm = async () => {
     if (archiveTarget) {
-      console.log('Archive project:', archiveTarget);
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === archiveTarget ? { ...p, status: 'FINALIZADO' as const, isPast: true } : p
-        )
-      );
-      setToast({ message: 'Proyecto archivado', type: 'success' });
+      const project = projects.find(p => p.id === archiveTarget);
+      const eventId = project?.events[0]?.id;
+      if (eventId) {
+        const result = await archiveEvent(eventId);
+        if (result.success) {
+          toast.success('Proyecto archivado');
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === archiveTarget ? { ...p, status: 'FINALIZADO' as const, isPast: true } : p
+            )
+          );
+        } else {
+          toast.error(result.error || 'Error al archivar');
+        }
+      } else {
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === archiveTarget ? { ...p, status: 'FINALIZADO' as const, isPast: true } : p
+          )
+        );
+        toast.success('Proyecto archivado');
+      }
     }
     setArchiveTarget(null);
-  };
-
-  const filterTabLabel = (tab: FilterTab) => {
-    switch (tab) {
-      case 'proximos': return 'proximos';
-      case 'pasados': return 'pasados';
-      default: return '';
-    }
   };
 
   const emptyLabel = filterTab === 'proximos' ? 'proximos' : filterTab === 'pasados' ? 'pasados' : '';
@@ -769,9 +802,6 @@ export default function EventsPage() {
   return (
     <div className="bg-[#f8f6f6] py-4">
       <div className="mx-auto max-w-[1200px] px-4">
-        {/* Toast */}
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
         {/* Header */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold text-gray-900">EVENTOS</h1>
@@ -821,7 +851,6 @@ export default function EventsPage() {
 
             return (
               <div key={project.id} className="overflow-hidden rounded-lg bg-white shadow-md">
-                {/* Card Header */}
                 <div
                   onClick={() => toggleExpand(project.id)}
                   className="flex cursor-pointer items-center justify-between px-3 py-2.5 transition-colors hover:bg-[#f8f6f6]"
@@ -866,7 +895,6 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                {/* Inline Detail Panel */}
                 {isExpanded && <EventDetailPanel project={project} />}
               </div>
             );
@@ -894,6 +922,7 @@ export default function EventsPage() {
           onClose={() => { setModalOpen(false); setEditingProject(null); setEditingProjectId(null); }}
           onSubmit={editingProjectId ? handleEditSubmit : handleCreateSubmit}
           initialData={editingProject}
+          submitting={submitting}
         />
 
         <ConfirmDialog

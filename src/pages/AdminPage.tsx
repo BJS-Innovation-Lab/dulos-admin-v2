@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { inviteUser } from '../app/actions/users.actions';
+import { updateSetting as updateSettingAction } from '../app/actions/settings.actions';
 import {
   fetchTeam,
   fetchAuditLogsByAction,
@@ -167,13 +170,19 @@ export default function AdminPage() {
     loadData();
   }, [logFilter]);
 
-  const updateSetting = (key: string, value: string) => {
+  const updateSetting = async (key: string, value: string) => {
     const updatedSettings = settings.map(s =>
       s.key === key ? { ...s, value } : s
     );
     setSettings(updatedSettings);
     localStorage.setItem('dulos_admin_settings', JSON.stringify(updatedSettings));
     setEditingSettingKey(null);
+    // Fire-and-forget server action + audit
+    updateSettingAction(key, value).then(result => {
+      if (result.success) {
+        toast.success('Configuración guardada');
+      }
+    });
   };
 
   const generalSettings = settings.filter(s => s.group === 'general');
@@ -540,7 +549,7 @@ export default function AdminPage() {
                 Cancelar
               </button>
               <button
-                onClick={() => { setShowRoleManage(false); }}
+                onClick={() => { setShowRoleManage(false); toast.success('Roles actualizados'); }}
                 className="px-4 py-2 rounded-lg text-white text-sm font-bold"
                 style={{ backgroundColor: ACCENT }}
               >
@@ -556,15 +565,27 @@ export default function AdminPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowInvite(false)}>
           <div className="bg-white rounded-xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-extrabold text-base mb-3">Invitar usuario</h3>
-            <input type="email" placeholder="Email" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]" />
-            <select className="w-full border rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]">
+            <input id="invite-email" type="email" placeholder="Email" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]" />
+            <select id="invite-role" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]">
               <option value="ADMIN">Administrador</option>
               <option value="MANAGER">Gerente</option>
               <option value="TAQUILLERO">Taquillero</option>
             </select>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowInvite(false)} className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700">Cancelar</button>
-              <button onClick={() => { alert('Invitación enviada'); setShowInvite(false); }} className="px-3 py-1.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: ACCENT }}>Enviar</button>
+              <button onClick={async () => {
+                const emailInput = document.querySelector<HTMLInputElement>('#invite-email');
+                const roleSelect = document.querySelector<HTMLSelectElement>('#invite-role');
+                if (emailInput && roleSelect) {
+                  const result = await inviteUser({ email: emailInput.value, role: roleSelect.value as 'ADMIN' | 'MANAGER' | 'TAQUILLERO' });
+                  if (result.success) {
+                    toast.success('Invitación enviada');
+                    setShowInvite(false);
+                  } else {
+                    toast.error(result.error || 'Error al enviar invitación');
+                  }
+                }
+              }} className="px-3 py-1.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: ACCENT }}>Enviar</button>
             </div>
           </div>
         </div>

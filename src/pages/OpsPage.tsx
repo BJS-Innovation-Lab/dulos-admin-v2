@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { toast } from 'sonner'
 import {
   fetchCheckins,
   fetchAllCoupons,
@@ -14,6 +15,8 @@ import {
   AuditLog,
   DulosEvent
 } from '../lib/supabase'
+import { createCoupon as createCouponAction } from '../app/actions/coupons.actions'
+import { couponSchema } from '../lib/validations/coupons.schema'
 
 const ACCENT = '#E63946'
 const PAGE_SIZE = 10
@@ -54,7 +57,8 @@ export default function OpsPage() {
     max_uses: '',
     valid_until: '',
   })
-  const [couponToast, setCouponToast] = useState(false)
+  const [couponSubmitting, setCouponSubmitting] = useState(false)
+  const [couponErrors, setCouponErrors] = useState<Record<string, string>>({})
 
   // Helper to search customers
   const { searchCustomerByNameOrEmail } = require('../lib/supabase')
@@ -121,25 +125,53 @@ export default function OpsPage() {
     setTimeout(() => setScanResult(null), 5000)
   }
 
-  const handleCreateCoupon = () => {
-    // In a real app this would POST to supabase
-    const newCoupon: Coupon = {
-      id: crypto.randomUUID(),
-      code: couponForm.code.toUpperCase(),
+  const handleCreateCoupon = async () => {
+    // Validate with Zod
+    const parsed = couponSchema.safeParse({
+      code: couponForm.code,
       discount_type: couponForm.discount_type,
       discount_value: Number(couponForm.discount_value) || 0,
-      used_count: 0,
-      max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : undefined,
-      is_active: true,
       event_id: couponForm.event_id || undefined,
+      max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : undefined,
       valid_until: couponForm.valid_until || undefined,
-      created_at: new Date().toISOString(),
+    })
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {}
+      parsed.error.issues.forEach((issue) => {
+        fieldErrors[issue.path[0] as string] = issue.message
+      })
+      setCouponErrors(fieldErrors)
+      return
     }
-    setCupones(prev => [newCoupon, ...prev])
-    setShowCouponModal(false)
-    setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', event_id: '', max_uses: '', valid_until: '' })
-    setCouponToast(true)
-    setTimeout(() => setCouponToast(false), 3000)
+    setCouponErrors({})
+    setCouponSubmitting(true)
+    try {
+      const result = await createCouponAction(parsed.data)
+      if (result.success) {
+        const newCoupon: Coupon = {
+          id: result.data?.id || crypto.randomUUID(),
+          code: parsed.data.code,
+          discount_type: parsed.data.discount_type,
+          discount_value: parsed.data.discount_value,
+          used_count: 0,
+          max_uses: parsed.data.max_uses || undefined,
+          is_active: true,
+          event_id: parsed.data.event_id || undefined,
+          valid_until: parsed.data.valid_until || undefined,
+          created_at: new Date().toISOString(),
+        }
+        setCupones(prev => [newCoupon, ...prev])
+        setShowCouponModal(false)
+        setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', event_id: '', max_uses: '', valid_until: '' })
+        toast.success('Cupón creado exitosamente')
+      } else {
+        toast.error(result.error || 'Error al crear el cupón')
+      }
+    } catch {
+      toast.error('Error al crear el cupón')
+    } finally {
+      setCouponSubmitting(false)
+    }
   }
 
   const eventosUnicos = [...new Set(checkins.map(c => c.event_name))]
@@ -190,12 +222,7 @@ export default function OpsPage() {
 
   return (
     <div className="space-y-3">
-      {/* Toast */}
-      {couponToast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold animate-in fade-in">
-          Cupón creado exitosamente
-        </div>
-      )}
+
 
       {/* Scanner Section — Hero */}
       <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-4 text-white">
@@ -537,8 +564,9 @@ export default function OpsPage() {
                   value={couponForm.code}
                   onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
                   placeholder="VERANO2026"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm uppercase focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+                  className={"w-full px-3 py-2 border rounded-lg text-sm uppercase focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946] " + (couponErrors.code ? 'border-red-400' : 'border-gray-200')}
                 />
+                {couponErrors.code && <p className="text-xs text-red-500 mt-1">{couponErrors.code}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Tipo de descuento</label>
@@ -601,10 +629,11 @@ export default function OpsPage() {
               </button>
               <button
                 onClick={handleCreateCoupon}
-                disabled={!couponForm.code || !couponForm.discount_value}
-                className="px-4 py-2 text-white rounded-lg text-sm font-bold disabled:opacity-40"
+                disabled={!couponForm.code || !couponForm.discount_value || couponSubmitting}
+                className="px-4 py-2 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-2"
                 style={{ backgroundColor: ACCENT }}
               >
+                {couponSubmitting && <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
                 Crear Cupón
               </button>
             </div>

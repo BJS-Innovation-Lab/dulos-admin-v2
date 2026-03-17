@@ -1,0 +1,77 @@
+'use server';
+
+import { logAction } from './audit.actions';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const headers = {
+  'apikey': SUPABASE_ANON_KEY,
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation',
+};
+
+export async function getZonesByEvent(eventId: string) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/dulos_ticket_zones?event_id=eq.${eventId}`, {
+      headers,
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`Error: ${res.status}`);
+    const data = await res.json();
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: 'Error al cargar zonas' };
+  }
+}
+
+export async function createZone(formData: {
+  event_id: string;
+  zone_name: string;
+  price: number;
+  original_price: number;
+  available: number;
+}) {
+  try {
+    const body = {
+      event_id: formData.event_id,
+      zone_name: formData.zone_name,
+      price: formData.price,
+      original_price: formData.original_price,
+      available: formData.available,
+      sold: 0,
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/dulos_ticket_zones`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Error: ${res.status}`);
+    const data = await res.json();
+    logAction('create', 'zone', formData.event_id, JSON.stringify({ zone_name: formData.zone_name }));
+    return { success: true, data: data[0] };
+  } catch (error) {
+    return { success: false, error: 'Error al crear la zona' };
+  }
+}
+
+export async function updateZone(id: string, formData: {
+  zone_name?: string;
+  price?: number;
+  available?: number;
+}) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/dulos_ticket_zones?event_id=eq.${id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(formData),
+    });
+    if (!res.ok) throw new Error(`Error: ${res.status}`);
+    const data = await res.json();
+    logAction('update', 'zone', id, JSON.stringify(formData));
+    return { success: true, data: data[0] };
+  } catch (error) {
+    return { success: false, error: 'Error al actualizar la zona' };
+  }
+}
