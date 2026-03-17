@@ -1,0 +1,59 @@
+'use server';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const headers = {
+  'apikey': SUPABASE_ANON_KEY,
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation',
+};
+
+export async function getAuditLog(filters?: { action?: string }) {
+  try {
+    let endpoint = `${SUPABASE_URL}/rest/v1/dulos_audit_logs?order=created_at.desc&limit=100`;
+    if (filters?.action) {
+      endpoint += `&action=ilike.*${filters.action}*`;
+    }
+    const res = await fetch(endpoint, { headers, cache: 'no-store' });
+    if (!res.ok) throw new Error(`Error: ${res.status}`);
+    const data = await res.json();
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: 'Error al cargar el log de auditoría' };
+  }
+}
+
+export async function logAction(
+  action: string,
+  entity_type: string,
+  entity_id: string,
+  details?: string,
+  user_email?: string
+) {
+  try {
+    const body = {
+      action,
+      entity_type,
+      entity_id,
+      details: details || null,
+      user_email: user_email || 'system',
+      created_at: new Date().toISOString(),
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/dulos_audit_logs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.error('Audit log failed:', res.status);
+      return { success: false, error: 'Error al registrar auditoría' };
+    }
+    const data = await res.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Audit log error:', error);
+    return { success: false, error: 'Error al registrar auditoría' };
+  }
+}

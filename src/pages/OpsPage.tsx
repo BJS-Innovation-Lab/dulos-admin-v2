@@ -1,20 +1,25 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { 
-  fetchCheckins, 
-  fetchAllCoupons, 
-  fetchTickets, 
-  searchCustomerByNameOrEmail, 
+import { toast } from 'sonner'
+import {
+  fetchCheckins,
+  fetchAllCoupons,
+  fetchTickets,
   fetchNotificationLogs,
-  Checkin, 
-  Coupon, 
-  Ticket, 
-  Customer, 
-  AuditLog 
+  fetchAllEvents,
+  Checkin,
+  Coupon,
+  Ticket,
+  Customer,
+  AuditLog,
+  DulosEvent
 } from '../lib/supabase'
+import { createCoupon as createCouponAction } from '../app/actions/coupons.actions'
+import { couponSchema } from '../lib/validations/coupons.schema'
 
 const ACCENT = '#E63946'
+const PAGE_SIZE = 10
 
 function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -26,10 +31,12 @@ export default function OpsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [cupones, setCupones] = useState<Coupon[]>([])
   const [notificationLogs, setNotificationLogs] = useState<AuditLog[]>([])
+  const [events, setEvents] = useState<DulosEvent[]>([])
   const [filtroEvento, setFiltroEvento] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [customerSearch, setCustomerSearch] = useState('')
-  const [searchResults, setSearchResults] = useState<Customer[]>([])
+  const [searchResults, setSearchResults] = useState<(Customer & { tickets?: Ticket[] })[]>([])
+  const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [scanResult, setScanResult] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -37,17 +44,38 @@ export default function OpsPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
+  // Pagination state for check-ins
+  const [checkinPage, setCheckinPage] = useState(0)
+
+  // Coupon modal state
+  const [showCouponModal, setShowCouponModal] = useState(false)
+  const [couponForm, setCouponForm] = useState({
+    code: '',
+    discount_type: 'percentage',
+    discount_value: '',
+    event_id: '',
+    max_uses: '',
+    valid_until: '',
+  })
+  const [couponSubmitting, setCouponSubmitting] = useState(false)
+  const [couponErrors, setCouponErrors] = useState<Record<string, string>>({})
+
+  // Helper to search customers
+  const { searchCustomerByNameOrEmail } = require('../lib/supabase')
+
   useEffect(() => {
     Promise.all([
       fetchCheckins().catch(() => []),
       fetchAllCoupons().catch(() => []),
       fetchTickets().catch(() => []),
       fetchNotificationLogs().catch(() => []),
-    ]).then(([ci, co, tk, nl]) => {
+      fetchAllEvents().catch(() => []),
+    ]).then(([ci, co, tk, nl, ev]) => {
       setCheckins(ci.filter((c: Checkin) => c.customer_name && c.customer_name !== 'DUPLICADO'))
       setCupones(co)
       setTickets(tk)
       setNotificationLogs(nl)
+      setEvents(ev)
       setLoading(false)
     })
   }, [])
@@ -58,6 +86,7 @@ export default function OpsPage() {
     try {
       const results = await searchCustomerByNameOrEmail(customerSearch.trim())
       setSearchResults(results)
+      setExpandedCustomer(null)
     } catch (error) {
       console.error('Error searching customers:', error)
     }
@@ -96,12 +125,67 @@ export default function OpsPage() {
     setTimeout(() => setScanResult(null), 5000)
   }
 
+  const handleCreateCoupon = async () => {
+    // Validate with Zod
+    const parsed = couponSchema.safeParse({
+      code: couponForm.code,
+      discount_type: couponForm.discount_type,
+      discount_value: Number(couponForm.discount_value) || 0,
+      event_id: couponForm.event_id || undefined,
+      max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : undefined,
+      valid_until: couponForm.valid_until || undefined,
+    })
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {}
+      parsed.error.issues.forEach((issue) => {
+        fieldErrors[issue.path[0] as string] = issue.message
+      })
+      setCouponErrors(fieldErrors)
+      return
+    }
+    setCouponErrors({})
+    setCouponSubmitting(true)
+    try {
+      const result = await createCouponAction(parsed.data)
+      if (result.success) {
+        const newCoupon: Coupon = {
+          id: result.data?.id || crypto.randomUUID(),
+          code: parsed.data.code,
+          discount_type: parsed.data.discount_type,
+          discount_value: parsed.data.discount_value,
+          used_count: 0,
+          max_uses: parsed.data.max_uses || undefined,
+          is_active: true,
+          event_id: parsed.data.event_id || undefined,
+          valid_until: parsed.data.valid_until || undefined,
+          created_at: new Date().toISOString(),
+        }
+        setCupones(prev => [newCoupon, ...prev])
+        setShowCouponModal(false)
+        setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', event_id: '', max_uses: '', valid_until: '' })
+        toast.success('Cupón creado exitosamente')
+      } else {
+        toast.error(result.error || 'Error al crear el cupón')
+      }
+    } catch {
+      toast.error('Error al crear el cupón')
+    } finally {
+      setCouponSubmitting(false)
+    }
+  }
+
   const eventosUnicos = [...new Set(checkins.map(c => c.event_name))]
   const historialFiltrado = checkins.filter(c => {
     if (filtroEvento && c.event_name !== filtroEvento) return false
     if (busqueda && !c.customer_name.toLowerCase().includes(busqueda.toLowerCase())) return false
     return true
   })
+
+  // Pagination
+  const totalPages = Math.ceil(historialFiltrado.length / PAGE_SIZE)
+  const paginatedCheckins = historialFiltrado.slice(checkinPage * PAGE_SIZE, (checkinPage + 1) * PAGE_SIZE)
+  const showFrom = historialFiltrado.length > 0 ? checkinPage * PAGE_SIZE + 1 : 0
+  const showTo = Math.min((checkinPage + 1) * PAGE_SIZE, historialFiltrado.length)
 
   const totalOk = checkins.filter(c => c.status === 'success' || c.status === 'valid').length
   const totalFail = checkins.length - totalOk
@@ -114,10 +198,32 @@ export default function OpsPage() {
   // Ticket stats
   const ticketsByStatus = tickets.reduce((a, t) => { a[t.status] = (a[t.status] || 0) + 1; return a }, {} as Record<string, number>)
 
-  if (loading) return <div className="p-4"><div className="h-40 bg-gray-100 rounded-lg animate-pulse" /></div>
+  const hasNotifications = notificationLogs.length > 0
+
+  if (loading) return (
+    <div className="space-y-3 animate-pulse">
+      <div className="bg-gray-200 rounded-xl h-64" />
+      <div className="bg-white rounded-lg p-4 space-y-3">
+        <div className="h-4 bg-gray-200 rounded w-1/3" />
+        <div className="h-10 bg-gray-100 rounded" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-white rounded-lg p-4 space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-1/4" />
+          {[1,2,3,4,5].map(i => <div key={i} className="h-6 bg-gray-100 rounded" />)}
+        </div>
+        <div className="bg-white rounded-lg p-4 space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-1/4" />
+          {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-100 rounded" />)}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-3">
+
+
       {/* Scanner Section — Hero */}
       <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-4 text-white">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -232,56 +338,102 @@ export default function OpsPage() {
               placeholder="Buscar por nombre o email..."
               className="flex-1 px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
             />
-            <button 
+            <button
               onClick={handleCustomerSearch}
               className="px-3 py-1.5 bg-[#E63946] text-white rounded text-sm font-bold hover:bg-[#c5303c]"
             >
               Buscar
             </button>
           </div>
-          
+
           {searchResults.length > 0 && (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {searchResults.map(customer => (
-                <div 
-                  key={customer.id}
-                  onClick={() => setSelectedCustomer(customer)}
-                  className="p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-extrabold text-sm">{customer.name}</p>
-                      <p className="text-xs text-gray-500">{customer.email}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {customer.total_orders} orden{customer.total_orders !== 1 ? 'es' : ''} • 
-                        Cliente desde {new Date(customer.created_at).toLocaleDateString('es-MX')}
-                      </p>
+                <div key={customer.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div
+                    onClick={() => setExpandedCustomer(expandedCustomer === customer.id ? null : customer.id)}
+                    className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">
+                          {customer.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-extrabold text-sm">{customer.name}</p>
+                          <p className="text-xs text-gray-500">{customer.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-bold">
+                          {customer.total_orders} boleto{customer.total_orders !== 1 ? 's' : ''}
+                        </span>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${expandedCustomer === customer.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </div>
                     </div>
-                    <button className="text-xs text-[#E63946] font-bold hover:underline">Ver Historial</button>
+                  </div>
+                  <div
+                    className="overflow-hidden transition-all duration-300 ease-in-out"
+                    style={{ maxHeight: expandedCustomer === customer.id ? '500px' : '0px', opacity: expandedCustomer === customer.id ? 1 : 0 }}
+                  >
+                    <div className="border-t border-gray-100 bg-gray-50 p-3">
+                      <p className="text-xs font-bold text-gray-600 mb-2">Historial de boletos</p>
+                      {(customer as any).tickets?.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {(customer as any).tickets.map((ticket: Ticket, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between bg-white rounded p-2 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[#E63946] font-bold">{ticket.ticket_number}</span>
+                                <span className="text-gray-500">{ticket.zone_name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">{new Date(ticket.created_at).toLocaleDateString('es-MX')}</span>
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                                  ticket.status === 'valid' ? 'bg-green-500' :
+                                  ticket.status === 'used' ? 'bg-blue-500' : 'bg-yellow-500'
+                                }`}>
+                                  {ticket.status === 'valid' ? 'Válido' : ticket.status === 'used' ? 'Usado' : 'Pendiente'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 text-center py-2">Sin boletos</p>
+                      )}
+                      <div className="mt-2 pt-2 border-t border-gray-200 flex justify-end">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedCustomer(customer); }}
+                          className="text-xs text-[#E63946] font-bold hover:underline"
+                        >
+                          Ver perfil completo
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-          
+
           {customerSearch && searchResults.length === 0 && (
             <p className="text-center text-gray-500 text-sm py-4">No se encontraron clientes</p>
           )}
         </div>
       </div>
 
-      {/* Historial + Cupones + Notifications */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* Historial + Cupones + Notifications (dynamic columns) */}
+      <div className={`grid grid-cols-1 ${hasNotifications ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-3`}>
         {/* Historial */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-extrabold">Historial de Check-ins</h3>
             <div className="flex gap-2">
-              <select value={filtroEvento} onChange={e => setFiltroEvento(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-xs">
+              <select value={filtroEvento} onChange={e => { setFiltroEvento(e.target.value); setCheckinPage(0) }} className="px-2 py-1 border border-gray-200 rounded text-xs">
                 <option value="">Todos</option>
                 {eventosUnicos.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
-              <input type="text" placeholder="Buscar..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-xs w-28" />
+              <input type="text" placeholder="Buscar..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setCheckinPage(0) }} className="px-2 py-1 border border-gray-200 rounded text-xs w-28" />
             </div>
           </div>
           <div className="max-h-[300px] overflow-y-auto">
@@ -296,7 +448,7 @@ export default function OpsPage() {
                 </tr>
               </thead>
               <tbody>
-                {historialFiltrado.map((c, i) => (
+                {paginatedCheckins.map((c, i) => (
                   <tr key={i} className="border-t border-gray-50 hover:bg-gray-50">
                     <td className="py-1.5 px-3 font-mono text-[#E63946]">{c.ticket_number}</td>
                     <td className="py-1.5 px-3">{c.customer_name}</td>
@@ -313,16 +465,38 @@ export default function OpsPage() {
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
+          {historialFiltrado.length > PAGE_SIZE && (
+            <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <span>{showFrom}-{showTo} de {historialFiltrado.length}</span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setCheckinPage(p => Math.max(0, p - 1))}
+                  disabled={checkinPage === 0}
+                  className="px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Ant
+                </button>
+                <button
+                  onClick={() => setCheckinPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={checkinPage >= totalPages - 1}
+                  className="px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Sig →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Notification Log */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-extrabold">Log de Notificaciones</h3>
-            <button className="px-2 py-1 text-white rounded text-xs font-bold" style={{ backgroundColor: ACCENT }}>Filtros</button>
-          </div>
-          <div className="max-h-[300px] overflow-y-auto">
-            {notificationLogs.length > 0 ? (
+        {/* Notification Log — only shown when there ARE notifications */}
+        {hasNotifications && (
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-extrabold">Log de Notificaciones</h3>
+              <button className="px-2 py-1 text-white rounded text-xs font-bold" style={{ backgroundColor: ACCENT }}>Filtros</button>
+            </div>
+            <div className="max-h-[300px] overflow-y-auto">
               <div className="divide-y divide-gray-50">
                 {notificationLogs.map(log => (
                   <div key={log.id} className="px-3 py-2">
@@ -340,17 +514,21 @@ export default function OpsPage() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="py-6 text-center text-gray-400 text-xs">Sin notificaciones</div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Cupones */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-extrabold">Cupones</h3>
-            <button className="px-2 py-1 text-white rounded text-xs font-bold" style={{ backgroundColor: ACCENT }}>+ Crear</button>
+            <button
+              onClick={() => setShowCouponModal(true)}
+              className="px-2 py-1 text-white rounded text-xs font-bold"
+              style={{ backgroundColor: ACCENT }}
+            >
+              + Crear
+            </button>
           </div>
           <div className="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
             {cupones.map(c => (
@@ -373,20 +551,110 @@ export default function OpsPage() {
         </div>
       </div>
 
+      {/* Coupon Create Modal */}
+      {showCouponModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCouponModal(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-extrabold text-gray-900 mb-4">Crear Cupón</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Código del cupón</label>
+                <input
+                  type="text"
+                  value={couponForm.code}
+                  onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  placeholder="VERANO2026"
+                  className={"w-full px-3 py-2 border rounded-lg text-sm uppercase focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946] " + (couponErrors.code ? 'border-red-400' : 'border-gray-200')}
+                />
+                {couponErrors.code && <p className="text-xs text-red-500 mt-1">{couponErrors.code}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Tipo de descuento</label>
+                <select
+                  value={couponForm.discount_type}
+                  onChange={e => setCouponForm({ ...couponForm, discount_type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+                >
+                  <option value="percentage">Porcentaje</option>
+                  <option value="fixed">Monto fijo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Valor</label>
+                <input
+                  type="number"
+                  value={couponForm.discount_value}
+                  onChange={e => setCouponForm({ ...couponForm, discount_value: e.target.value })}
+                  placeholder={couponForm.discount_type === 'percentage' ? '15' : '100'}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Evento asociado</label>
+                <select
+                  value={couponForm.event_id}
+                  onChange={e => setCouponForm({ ...couponForm, event_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+                >
+                  <option value="">Todos los eventos</option>
+                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Límite de uso</label>
+                <input
+                  type="number"
+                  value={couponForm.max_uses}
+                  onChange={e => setCouponForm({ ...couponForm, max_uses: e.target.value })}
+                  placeholder="100"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Fecha de expiración</label>
+                <input
+                  type="date"
+                  value={couponForm.valid_until}
+                  onChange={e => setCouponForm({ ...couponForm, valid_until: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end mt-6">
+              <button
+                onClick={() => setShowCouponModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateCoupon}
+                disabled={!couponForm.code || !couponForm.discount_value || couponSubmitting}
+                className="px-4 py-2 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-2"
+                style={{ backgroundColor: ACCENT }}
+              >
+                {couponSubmitting && <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                Crear Cupón
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Customer Detail Modal */}
       {selectedCustomer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedCustomer(null)}>
           <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-extrabold text-gray-900">Historial de Cliente</h3>
-              <button 
+              <button
                 onClick={() => setSelectedCustomer(null)}
                 className="text-gray-500 hover:text-gray-700 text-xl"
               >
                 ×
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="font-extrabold text-lg text-gray-900">{selectedCustomer.name}</p>
@@ -418,7 +686,7 @@ export default function OpsPage() {
                           ticket.status === 'valid' ? 'bg-green-500' :
                           ticket.status === 'used' ? 'bg-blue-500' : 'bg-yellow-500'
                         }`}>
-                          {ticket.status === 'valid' ? 'Válido' : 
+                          {ticket.status === 'valid' ? 'Válido' :
                            ticket.status === 'used' ? 'Usado' : 'Pendiente'}
                         </span>
                       </div>
@@ -430,13 +698,13 @@ export default function OpsPage() {
               </div>
 
               <div className="flex gap-2 justify-end pt-4 border-t">
-                <button 
+                <button
                   onClick={() => alert('Enviar email al cliente')}
                   className="px-4 py-2 bg-[#E63946] text-white rounded-lg text-sm font-bold hover:bg-[#c5303c]"
                 >
                   Enviar Email
                 </button>
-                <button 
+                <button
                   onClick={() => setSelectedCustomer(null)}
                   className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-bold"
                 >
