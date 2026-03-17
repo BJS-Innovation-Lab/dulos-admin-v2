@@ -431,7 +431,7 @@ export default function FinancePage() {
 
   const SortHeader = ({ col, label }: { col: keyof Transaction; label: string }) => (
     <th
-      className="text-left py-3 px-3 font-bold text-white text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors"
+      className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap"
       onClick={() => toggleSort(col)}
     >
       <span className="inline-flex items-center gap-1">
@@ -464,8 +464,8 @@ export default function FinancePage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900">Panel Financiero</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Metricas de ingresos, capacidad y tendencias</p>
+          <h1 className="text-lg sm:text-xl font-extrabold text-gray-900">Panel Financiero</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Metricas de ingresos, capacidad y tendencias</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Date range presets */}
@@ -474,7 +474,7 @@ export default function FinancePage() {
               <button
                 key={opt.key}
                 onClick={() => setDateRange(opt.key)}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
                   dateRange === opt.key
                     ? 'bg-[#1E293B] text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -489,7 +489,7 @@ export default function FinancePage() {
           <select
             value={selectedEvent}
             onChange={e => setSelectedEvent(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]"
+            className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]"
           >
             <option value="">Todos los Eventos</option>
             {events.map(event => (
@@ -500,24 +500,25 @@ export default function FinancePage() {
           {/* Export */}
           <button
             onClick={exportCSV}
-            className="px-4 py-2 bg-[#E63946] text-white rounded-lg text-sm font-medium hover:bg-[#c5303c] transition-colors flex items-center gap-2"
+            className="px-3 sm:px-4 py-2 bg-[#E63946] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#c5303c] transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Exportar CSV
+            <span className="hidden sm:inline">Exportar CSV</span>
+            <span className="sm:hidden">CSV</span>
           </button>
         </div>
       </div>
 
       {/* Sub-tabs */}
       <div className="section-card">
-        <div className="flex gap-6 px-5 border-b border-gray-100 overflow-x-auto">
+        <div className="flex gap-4 sm:gap-6 px-3 sm:px-5 border-b border-gray-100 overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`relative py-4 text-sm font-bold whitespace-nowrap transition-all ${
+              className={`relative py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                 activeTab === tab.key ? 'text-[#E63946]' : 'text-gray-500 hover:text-gray-800'
               }`}
             >
@@ -549,21 +550,21 @@ export default function FinancePage() {
                       {event.image_url && (
                         <img src={event.image_url} alt={event.event_name} className="w-12 h-12 rounded-lg object-cover" />
                       )}
-                      <div className="flex-1">
-                        <p className="font-bold text-sm text-gray-900">{event.event_name}</p>
-                        <p className="text-lg font-extrabold text-[#E63946]">{fmtCurrency(event.revenue)}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-900 truncate">{event.event_name}</p>
+                        <p className="text-base sm:text-lg font-extrabold text-[#E63946]">{fmtCurrency(event.revenue)}</p>
                       </div>
                     </div>
                   </div>
                 )) : (
-                  <div className="col-span-3 text-center text-gray-500 py-4 text-sm">No hay datos de eventos disponibles</div>
+                  <div className="col-span-full text-center text-gray-500 py-4 text-sm">No hay datos de eventos disponibles</div>
                 )}
               </div>
             </div>
           </div>
 
           {/* Resumen por Zona + Donut — compact row */}
-          <div className="flex flex-row items-center gap-3 mt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-1">
             {zoneRevenues.length > 0 ? zoneRevenues.slice(0, 3).map(z => (
               <div key={z.zone} className="flex-1 p-2 bg-white rounded-lg border border-gray-200">
                 <p className="text-[11px] font-bold text-gray-500 uppercase">{z.zone}</p>
@@ -573,7 +574,7 @@ export default function FinancePage() {
               <div className="flex-1 text-center text-gray-500 py-2 text-sm">No hay datos de zonas</div>
             )}
             {donutData.length > 0 && (
-              <div className="flex-shrink-0 flex items-center gap-2">
+              <div className="flex-shrink-0 flex items-center gap-2 justify-center sm:justify-start">
                 <div className="relative">
                   <PieChart width={120} height={120}>
                     <Pie
@@ -641,20 +642,20 @@ export default function FinancePage() {
       {activeTab === 'capacidad' && (
         <div className="space-y-4 animate-fade-in">
           <div className="section-card">
-            <div className="section-card-header">
+            <div className="section-card-header flex-wrap gap-2">
               <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <span className="section-card-title">Ocupacion por Funcion</span>
-              <div className="flex gap-4 text-xs ml-auto">
+              <div className="flex flex-wrap gap-2 sm:gap-4 text-[10px] sm:text-xs ml-auto">
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500" />Critico (&gt;80%)
+                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500" />Critico
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />Alto (50-80%)
+                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-yellow-500" />Alto
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" />Normal (&lt;50%)
+                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500" />Normal
                 </span>
               </div>
             </div>
@@ -667,7 +668,7 @@ export default function FinancePage() {
             onToggle={(index) => setExpandedCapacity(prev => prev === index ? null : index)}
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
             <div className="metric-card">
               <p className="metric-card-title">Eventos Criticos</p>
               <p className="metric-card-value text-red-500">{capacityStats.critical}</p>
@@ -751,17 +752,17 @@ export default function FinancePage() {
                     {eventOccupancy.map((ev, i) => {
                       const barColor = ev.occupancy > 80 ? 'bg-[#E63946]' : ev.occupancy >= 50 ? 'bg-yellow-500' : 'bg-green-500';
                       return (
-                        <div key={i} className="flex items-center gap-3">
+                        <div key={i} className="flex items-center gap-2 sm:gap-3">
                           {ev.image_url ? (
-                            <img src={ev.image_url} alt={ev.name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                            <img src={ev.image_url} alt={ev.name} className="w-6 h-6 rounded object-cover flex-shrink-0 hidden sm:block" />
                           ) : (
-                            <div className="w-6 h-6 rounded bg-gray-200 flex-shrink-0" />
+                            <div className="w-6 h-6 rounded bg-gray-200 flex-shrink-0 hidden sm:block" />
                           )}
-                          <span className="text-sm text-gray-700 w-36 truncate flex-shrink-0">{ev.name}</span>
+                          <span className="text-xs sm:text-sm text-gray-700 w-24 sm:w-36 truncate flex-shrink-0">{ev.name}</span>
                           <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
                             <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(ev.occupancy, 100)}%` }} />
                           </div>
-                          <span className="text-sm font-bold text-gray-900 w-12 text-right">{ev.occupancy}%</span>
+                          <span className="text-xs sm:text-sm font-bold text-gray-900 w-10 sm:w-12 text-right">{ev.occupancy}%</span>
                         </div>
                       );
                     })}
@@ -782,22 +783,22 @@ export default function FinancePage() {
               <span className="section-card-title">Resumen</span>
             </div>
             <div className="section-card-body">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Mejor dia de venta</p>
-                  <p className="text-lg font-extrabold text-gray-900">{summaryStats.bestDay}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-gray-500">Mejor dia de venta</p>
+                  <p className="text-base sm:text-lg font-extrabold text-gray-900">{summaryStats.bestDay}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Precio promedio de ticket</p>
-                  <p className="text-lg font-extrabold text-gray-900">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-gray-500">Precio promedio</p>
+                  <p className="text-base sm:text-lg font-extrabold text-gray-900">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Evento mas popular</p>
-                  <p className="text-lg font-extrabold text-gray-900 truncate">{summaryStats.popularEvent}</p>
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-gray-500">Evento mas popular</p>
+                  <p className="text-base sm:text-lg font-extrabold text-gray-900 truncate">{summaryStats.popularEvent}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Zona mas popular</p>
-                  <p className="text-lg font-extrabold text-gray-900">{summaryStats.popularZone}</p>
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-gray-500">Zona mas popular</p>
+                  <p className="text-base sm:text-lg font-extrabold text-gray-900">{summaryStats.popularZone}</p>
                 </div>
               </div>
             </div>
@@ -813,11 +814,11 @@ export default function FinancePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
             <span className="section-card-title">Historial de Transacciones</span>
-            <span className="ml-auto text-sm text-gray-500">{processedTransactions.total} registros</span>
+            <span className="ml-auto text-xs sm:text-sm text-gray-500">{processedTransactions.total} registros</span>
           </div>
 
           {/* Search bar */}
-          <div className="px-5 py-3 border-b border-gray-100">
+          <div className="px-3 sm:px-5 py-3 border-b border-gray-100">
             <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -840,8 +841,12 @@ export default function FinancePage() {
                     <SortHeader col="id" label="ID" />
                     <SortHeader col="date" label="Fecha" />
                     <SortHeader col="customer_name" label="Cliente" />
-                    <SortHeader col="event_name" label="Evento" />
-                    <SortHeader col="zone_name" label="Zona" />
+                    <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap hidden md:table-cell" onClick={() => toggleSort('event_name')}>
+                      <span className="inline-flex items-center gap-1">Evento{txSort.col === 'event_name' && <svg className={`w-3 h-3 transition-transform ${txSort.asc ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>}</span>
+                    </th>
+                    <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap hidden lg:table-cell" onClick={() => toggleSort('zone_name')}>
+                      <span className="inline-flex items-center gap-1">Zona{txSort.col === 'zone_name' && <svg className={`w-3 h-3 transition-transform ${txSort.asc ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>}</span>
+                    </th>
                     <SortHeader col="amount" label="Monto" />
                     <SortHeader col="status" label="Estado" />
                   </tr>
@@ -849,19 +854,19 @@ export default function FinancePage() {
                 <tbody>
                   {processedTransactions.items.length > 0 ? processedTransactions.items.map(tx => (
                     <tr key={tx.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-3 text-[13px] font-mono text-[#E63946] font-bold">{tx.id}</td>
-                      <td className="py-2 px-3 text-[13px] text-gray-500 whitespace-nowrap">
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-mono text-[#E63946] font-bold">{tx.id}</td>
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-500 whitespace-nowrap">
                         {new Date(tx.date).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="py-2 px-3 text-[13px]">
-                        <div className="font-bold">{tx.customer_name}</div>
-                        <div className="text-gray-500 text-xs">{tx.customer_email}</div>
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px]">
+                        <div className="font-bold truncate max-w-[100px] sm:max-w-none">{tx.customer_name}</div>
+                        <div className="text-gray-500 text-[10px] sm:text-xs truncate max-w-[100px] sm:max-w-none">{tx.customer_email}</div>
                       </td>
-                      <td className="py-2 px-3 text-[13px] text-gray-600">{tx.event_name}</td>
-                      <td className="py-2 px-3 text-[13px] text-gray-600">{tx.zone_name}</td>
-                      <td className="py-2 px-3 text-[13px] font-bold text-gray-900">{fmtCurrency(tx.amount)}</td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold text-white ${
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600 hidden md:table-cell">{tx.event_name}</td>
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600 hidden lg:table-cell">{tx.zone_name}</td>
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-bold text-gray-900">{fmtCurrency(tx.amount)}</td>
+                      <td className="py-2 px-2 sm:px-3 text-center">
+                        <span className={`inline-block px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold text-white ${
                           tx.status === 'Completado' ? 'bg-green-500' :
                           tx.status === 'Reembolsado' ? 'bg-red-500' :
                           tx.status === 'Usado' ? 'bg-blue-500' : 'bg-yellow-500'
@@ -881,22 +886,22 @@ export default function FinancePage() {
 
             {/* Pagination */}
             {processedTransactions.total > PER_PAGE && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-                <span className="text-sm text-gray-500">
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-t border-gray-100">
+                <span className="text-xs sm:text-sm text-gray-500">
                   {txPage * PER_PAGE + 1}-{Math.min((txPage + 1) * PER_PAGE, processedTransactions.total)} de {processedTransactions.total}
                 </span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTxPage(p => Math.max(0, p - 1))}
                     disabled={txPage === 0}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                    className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
                   >
                     Anterior
                   </button>
                   <button
                     onClick={() => setTxPage(p => p + 1)}
                     disabled={(txPage + 1) * PER_PAGE >= processedTransactions.total}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                    className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
                   >
                     Siguiente
                   </button>

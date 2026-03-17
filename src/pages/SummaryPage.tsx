@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { toast } from 'sonner';
 import HeroMetrics from '../components/HeroMetrics';
 import {
   fetchEvents,
@@ -116,6 +117,8 @@ export default function SummaryPage() {
   const [allBoletos, setAllBoletos] = useState<{ id: string; ticket: string; cliente: string; evento: string; zona: string; status: string; fecha: string }[]>([]);
   const [allZones, setAllZones] = useState<TicketZone[]>([]);
   const [allEvents, setAllEvents] = useState<DulosEvent[]>([]);
+  const [showAllActivity, setShowAllActivity] = useState(false);
+  const [allActividad, setAllActividad] = useState<Actividad[]>([]);
   const detailRef = useRef<HTMLDivElement>(null);
 
   const BOLETOS_PER_PAGE = 5;
@@ -230,7 +233,7 @@ export default function SummaryPage() {
           zonePriceMap.set(key, z.price);
         });
 
-        orders.filter(o => o.customer_name && o.customer_name !== 'null').slice(0, 8).forEach((o) => {
+        orders.filter(o => o.customer_name && o.customer_name !== 'null').slice(0, 20).forEach((o) => {
           const eventName = eventMap.get(o.event_id)?.name || o.event_id;
           const key = `${o.customer_name}-${eventName}`;
           if (!seen.has(key)) {
@@ -246,7 +249,7 @@ export default function SummaryPage() {
           }
         });
 
-        checkins.filter(c => c.customer_name && c.customer_name !== 'DUPLICADO').slice(0, 6).forEach((c) => {
+        checkins.filter(c => c.customer_name && c.customer_name !== 'DUPLICADO').slice(0, 10).forEach((c) => {
           const key = `${c.customer_name}-${c.event_name}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -259,6 +262,7 @@ export default function SummaryPage() {
           }
         });
 
+        setAllActividad(actividades);
         setActividadReciente(actividades.slice(0, 6));
 
         // All boletos for pagination
@@ -357,6 +361,8 @@ export default function SummaryPage() {
     </div>
   );
 
+  const displayedActividad = showAllActivity ? allActividad : actividadReciente;
+
   return (
     <div className="space-y-4">
       <HeroMetrics revenue={metrics.revenue} tickets={metrics.tickets} occupancy={metrics.occupancy} upcoming={metrics.upcoming} />
@@ -397,7 +403,7 @@ export default function SummaryPage() {
         </div>
 
         {funcionesProximas.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 p-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
             {funcionesProximas.map((f) => {
               const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(f.nombre.toLowerCase()));
               const isExpanded = expandedEventId === f.eventId;
@@ -408,17 +414,17 @@ export default function SummaryPage() {
                   className={`flex gap-0 rounded-xl border overflow-hidden transition-all hover:shadow-sm cursor-pointer ${isExpanded ? 'ring-2 ring-[#E63946] border-[#E63946]' : hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}
                 >
                   {f.image_url ? (
-                    <img src={f.image_url} alt="" className="w-20 object-cover flex-shrink-0" />
+                    <img src={f.image_url} alt="" className="w-16 sm:w-20 object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-20 bg-gray-100 flex items-center justify-center flex-shrink-0">🎭</div>
+                    <div className="w-16 sm:w-20 bg-gray-100 flex items-center justify-center flex-shrink-0">🎭</div>
                   )}
-                  <div className="flex-1 min-w-0 flex flex-col justify-center py-2.5 px-3">
+                  <div className="flex-1 min-w-0 flex flex-col justify-center py-2 sm:py-2.5 px-2 sm:px-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-extrabold text-gray-900 text-[13px] truncate leading-tight">{f.nombre}</p>
-                      <span className={`text-[13px] font-black flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
+                      <p className="font-extrabold text-gray-900 text-xs sm:text-[13px] truncate leading-tight">{f.nombre}</p>
+                      <span className={`text-xs sm:text-[13px] font-black flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
                     </div>
-                    <p className="text-[12px] text-gray-500 mt-1 truncate font-medium">{f.hora} · {f.sala}</p>
-                    <p className={`text-[12px] font-bold mt-0.5 ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disponibles</p>
+                    <p className="text-[11px] sm:text-[12px] text-gray-500 mt-1 truncate font-medium">{f.hora} · {f.sala}</p>
+                    <p className={`text-[11px] sm:text-[12px] font-bold mt-0.5 ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disponibles</p>
                   </div>
                 </div>
               );
@@ -429,20 +435,20 @@ export default function SummaryPage() {
         {/* Expanded event detail panel */}
         <div
           className="overflow-hidden transition-all duration-300 ease-in-out"
-          style={{ maxHeight: expandedEventId ? '400px' : '0px' }}
+          style={{ maxHeight: expandedEventId ? '500px' : '0px' }}
         >
           {expandedEventData && (
-            <div ref={detailRef} className="border-t border-gray-100 p-4">
-              <div className="flex gap-4">
+            <div ref={detailRef} className="border-t border-gray-100 p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 {/* Left: larger event image */}
                 {expandedEventData.image_url ? (
                   <img
                     src={expandedEventData.image_url}
                     alt={expandedEventData.nombre}
-                    className="w-[200px] h-[130px] rounded-xl object-cover flex-shrink-0"
+                    className="w-full sm:w-[200px] h-[160px] sm:h-[130px] rounded-xl object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-[200px] h-[130px] rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-3xl text-gray-400">🎭</div>
+                  <div className="w-full sm:w-[200px] h-[160px] sm:h-[130px] rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-3xl text-gray-400">🎭</div>
                 )}
 
                 {/* Right: event info + occupancy bar */}
@@ -475,7 +481,7 @@ export default function SummaryPage() {
 
               {/* Zone details table */}
               {eventZoneDetails.length > 0 && (
-                <div className="mt-3">
+                <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-left text-gray-500 border-b border-gray-100">
@@ -533,21 +539,34 @@ export default function SummaryPage() {
               )}
             </div>
             <div className="divide-y divide-gray-50">
-              {actividadReciente.map((a) => (
+              {displayedActividad.map((a) => (
                 <div key={a.id} className="flex items-center gap-2 px-3 py-1.5">
                   <span className="text-sm flex-shrink-0 w-5 text-center">{getActividadIcon(a.tipo)}</span>
-                  <p className="flex-1 text-[13px] text-gray-700 truncate font-medium">{a.mensaje}</p>
+                  <p className="flex-1 text-xs sm:text-[13px] text-gray-700 truncate font-medium">{a.mensaje}</p>
                   {a.monto !== undefined && a.monto > 0 && (
-                    <span className="text-[12px] text-emerald-600 font-bold tabular-nums flex-shrink-0">
+                    <span className="text-[11px] sm:text-[12px] text-emerald-600 font-bold tabular-nums flex-shrink-0">
                       ${a.monto.toLocaleString()}
                     </span>
                   )}
-                  <span className="text-[12px] text-gray-400 tabular-nums font-semibold flex-shrink-0">{a.tiempo}</span>
+                  <span className="text-[11px] sm:text-[12px] text-gray-400 tabular-nums font-semibold flex-shrink-0">{a.tiempo}</span>
                 </div>
               ))}
             </div>
             <div className="px-3 py-2 border-t border-gray-50">
-              <button className="text-xs text-[#E63946] font-bold hover:underline">Ver todo</button>
+              <button
+                onClick={() => {
+                  if (showAllActivity) {
+                    setShowAllActivity(false);
+                  } else if (allActividad.length > 6) {
+                    setShowAllActivity(true);
+                  } else {
+                    toast.info('Próximamente');
+                  }
+                }}
+                className="text-xs text-[#E63946] font-bold hover:underline"
+              >
+                {showAllActivity ? 'Mostrar menos' : 'Ver todo'}
+              </button>
             </div>
           </div>
         )}
@@ -558,32 +577,34 @@ export default function SummaryPage() {
             <div className="section-card-header !py-2 !px-3">
               <span className="font-bold text-gray-900 text-sm">Boletos Vendidos</span>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-500 border-b">
-                  <th className="px-3 py-1.5 font-medium">Ticket</th>
-                  <th className="px-3 py-1.5 font-medium">Cliente</th>
-                  <th className="px-3 py-1.5 font-medium">Evento</th>
-                  <th className="px-3 py-1.5 font-medium">Zona</th>
-                  <th className="px-3 py-1.5 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedBoletos.map((b) => (
-                  <tr key={b.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-3 py-1.5 font-mono text-xs text-[#E63946]">{b.ticket}</td>
-                    <td className="px-3 py-1.5 text-gray-900">{b.cliente}</td>
-                    <td className="px-3 py-1.5 text-gray-600 truncate max-w-[120px]">{b.evento}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{b.zona}</td>
-                    <td className="px-3 py-1.5">
-                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${b.status === 'valid' ? 'bg-green-50 text-green-700' : b.status === 'used' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {b.status === 'valid' ? 'Válido' : b.status === 'used' ? 'Usado' : b.status}
-                      </span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs sm:text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 border-b">
+                    <th className="px-3 py-1.5 font-medium">Ticket</th>
+                    <th className="px-3 py-1.5 font-medium">Cliente</th>
+                    <th className="px-3 py-1.5 font-medium hidden sm:table-cell">Evento</th>
+                    <th className="px-3 py-1.5 font-medium hidden md:table-cell">Zona</th>
+                    <th className="px-3 py-1.5 font-medium">Estado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedBoletos.map((b) => (
+                    <tr key={b.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-3 py-1.5 font-mono text-xs text-[#E63946]">{b.ticket}</td>
+                      <td className="px-3 py-1.5 text-gray-900 truncate max-w-[100px] sm:max-w-none">{b.cliente}</td>
+                      <td className="px-3 py-1.5 text-gray-600 truncate max-w-[120px] hidden sm:table-cell">{b.evento}</td>
+                      <td className="px-3 py-1.5 text-gray-500 hidden md:table-cell">{b.zona}</td>
+                      <td className="px-3 py-1.5">
+                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${b.status === 'valid' ? 'bg-green-50 text-green-700' : b.status === 'used' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {b.status === 'valid' ? 'Válido' : b.status === 'used' ? 'Usado' : b.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {/* Pagination */}
             {totalBoletos > BOLETOS_PER_PAGE && (
               <div className="flex items-center justify-between px-3 py-2 border-t border-gray-50 text-xs text-gray-500">

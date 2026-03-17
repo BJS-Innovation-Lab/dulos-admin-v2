@@ -206,13 +206,13 @@ function ProjectModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4"
+        className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 max-w-lg w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-5">
-          <h3 className="font-bold text-lg text-gray-900">
+          <h3 className="font-bold text-base sm:text-lg text-gray-900">
             {initialData ? 'Editar Proyecto' : 'Nuevo Proyecto'}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
@@ -316,8 +316,8 @@ function ConfirmDialog({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-bold text-gray-900 mb-2">{title}</h3>
         <p className="text-sm text-gray-600 mb-5">{message}</p>
         <div className="flex gap-3">
@@ -401,53 +401,53 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
 
   return (
     <div className="border-t border-gray-200 bg-[#f8f6f6] overflow-hidden transition-all duration-300 ease-in-out animate-fade-in">
-      <div className="p-4">
-        <div className="flex flex-col lg:flex-row gap-5">
+      <div className="p-3 sm:p-4">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-5">
           <div className="lg:w-[40%] flex-shrink-0">
             {project.image_url ? (
               <img
                 src={project.image_url}
                 alt={project.name}
-                className="w-full h-48 rounded-xl object-cover shadow-md"
+                className="w-full h-36 sm:h-48 rounded-xl object-cover shadow-md"
               />
             ) : (
-              <div className="w-full h-48 rounded-xl bg-gray-200 flex items-center justify-center">
+              <div className="w-full h-36 sm:h-48 rounded-xl bg-gray-200 flex items-center justify-center">
                 <span className="text-gray-400 text-4xl">?</span>
               </div>
             )}
-            <h3 className="font-bold text-gray-900 mt-3 text-base">{project.name}</h3>
-            <p className="text-sm text-gray-500">{venue}</p>
-            <p className="text-sm text-gray-500">{formatDate(dateRange)}</p>
+            <h3 className="font-bold text-gray-900 mt-3 text-sm sm:text-base">{project.name}</h3>
+            <p className="text-xs sm:text-sm text-gray-500">{venue}</p>
+            <p className="text-xs sm:text-sm text-gray-500">{formatDate(dateRange)}</p>
           </div>
 
-          <div className="lg:w-[60%] space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl bg-white border border-gray-200 p-3 text-center">
-                <p className="text-xs text-gray-500 mb-1">Revenue</p>
-                <p className="text-lg font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
+          <div className="lg:w-[60%] space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="rounded-xl bg-white border border-gray-200 p-2 sm:p-3 text-center">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-1">Revenue</p>
+                <p className="text-sm sm:text-lg font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
               </div>
-              <div className="rounded-xl bg-white border border-gray-200 p-3 text-center">
-                <p className="text-xs text-gray-500 mb-1">Boletos Vendidos</p>
-                <p className="text-lg font-bold text-gray-900">{totalSold.toLocaleString()}</p>
+              <div className="rounded-xl bg-white border border-gray-200 p-2 sm:p-3 text-center">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-1">Vendidos</p>
+                <p className="text-sm sm:text-lg font-bold text-gray-900">{totalSold.toLocaleString()}</p>
               </div>
-              <div className="rounded-xl bg-white border border-gray-200 p-3 text-center">
-                <p className="text-xs text-gray-500 mb-1">Ocupacion %</p>
-                <p className="text-lg font-bold text-gray-900">{occupancy.toFixed(1)}%</p>
+              <div className="rounded-xl bg-white border border-gray-200 p-2 sm:p-3 text-center">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-1">Ocupacion</p>
+                <p className="text-sm sm:text-lg font-bold text-gray-900">{occupancy.toFixed(1)}%</p>
               </div>
             </div>
 
             {allZones.length > 0 && (
               <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs sm:text-sm">
                     <thead className="bg-[#1E293B]">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-white">Zona</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-white">Capacidad</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-white">Vendidos</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-white">Disponible</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-white">Precio</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-white">%</th>
+                        <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-white">Zona</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-white">Cap.</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-white">Vend.</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-white hidden sm:table-cell">Disp.</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-white hidden sm:table-cell">Precio</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-white">%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -456,12 +456,12 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
                         const pct = z.capacidad > 0 ? (z.vendidos / z.capacidad) * 100 : 0;
                         return (
                           <tr key={z.id} className="border-b border-gray-100 last:border-0">
-                            <td className="px-3 py-2 font-medium text-gray-900">{z.nombre}</td>
-                            <td className="px-3 py-2 text-right text-gray-600">{z.capacidad}</td>
-                            <td className="px-3 py-2 text-right text-gray-600">{z.vendidos}</td>
-                            <td className="px-3 py-2 text-right text-gray-600">{avail}</td>
-                            <td className="px-3 py-2 text-right text-gray-600">{formatCurrency(z.precio)}</td>
-                            <td className="px-3 py-2 text-right">
+                            <td className="px-2 sm:px-3 py-2 font-medium text-gray-900">{z.nombre}</td>
+                            <td className="px-2 sm:px-3 py-2 text-right text-gray-600">{z.capacidad}</td>
+                            <td className="px-2 sm:px-3 py-2 text-right text-gray-600">{z.vendidos}</td>
+                            <td className="px-2 sm:px-3 py-2 text-right text-gray-600 hidden sm:table-cell">{avail}</td>
+                            <td className="px-2 sm:px-3 py-2 text-right text-gray-600 hidden sm:table-cell">{formatCurrency(z.precio)}</td>
+                            <td className="px-2 sm:px-3 py-2 text-right">
                               <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium text-white ${getOccupancyColor(pct)}`}>
                                 {pct.toFixed(0)}%
                               </span>
@@ -476,10 +476,10 @@ function EventDetailPanel({ project }: { project: ProjectDisplay }) {
             )}
 
             {allSchedules.length > 0 && (
-              <div className="rounded-xl bg-white border border-gray-200 p-3">
+              <div className="rounded-xl bg-white border border-gray-200 p-2 sm:p-3">
                 <h4 className="font-bold text-gray-900 text-sm mb-2">Funciones</h4>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs sm:text-sm">
                     <thead>
                       <tr className="text-left text-xs text-gray-500 border-b">
                         <th className="pb-2 font-medium">Fecha</th>
@@ -787,9 +787,9 @@ export default function EventsPage() {
   if (loading) {
     return (
       <div className="bg-[#f8f6f6] py-4">
-        <div className="mx-auto max-w-[1200px] px-4">
+        <div className="mx-auto max-w-[1200px] px-3 sm:px-4">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-xl font-bold text-gray-900">EVENTOS</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900">EVENTOS</h1>
           </div>
           <div className="space-y-4">
             {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
@@ -801,21 +801,21 @@ export default function EventsPage() {
 
   return (
     <div className="bg-[#f8f6f6] py-4">
-      <div className="mx-auto max-w-[1200px] px-4">
+      <div className="mx-auto max-w-[1200px] px-3 sm:px-4">
         {/* Header */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-bold text-gray-900">EVENTOS</h1>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900">EVENTOS</h1>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <input
               type="text"
               placeholder="Buscar proyectos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="rounded-lg border border-gray-300 px-4 py-2 focus:border-[#E63946] focus:outline-none focus:ring-1 focus:ring-[#E63946]"
+              className="rounded-lg border border-gray-300 px-3 sm:px-4 py-2 text-sm focus:border-[#E63946] focus:outline-none focus:ring-1 focus:ring-[#E63946]"
             />
             <button
               onClick={() => { setEditingProject(null); setEditingProjectId(null); setModalOpen(true); }}
-              className="rounded-lg bg-[#E63946] px-4 py-2 font-medium text-white transition-colors hover:bg-[#c5303c]"
+              className="rounded-lg bg-[#E63946] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#c5303c]"
             >
               + Nuevo Proyecto
             </button>
@@ -832,7 +832,7 @@ export default function EventsPage() {
             <button
               key={opt.key}
               onClick={() => setFilterTab(opt.key)}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-lg ${
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors rounded-lg ${
                 filterTab === opt.key
                   ? 'bg-[#1E293B] text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -853,9 +853,9 @@ export default function EventsPage() {
               <div key={project.id} className="overflow-hidden rounded-lg bg-white shadow-md">
                 <div
                   onClick={() => toggleExpand(project.id)}
-                  className="flex cursor-pointer items-center justify-between px-3 py-2.5 transition-colors hover:bg-[#f8f6f6]"
+                  className="flex cursor-pointer items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 transition-colors hover:bg-[#f8f6f6]"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <svg
                       className={`h-4 w-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
                       fill="none"
@@ -865,27 +865,27 @@ export default function EventsPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                     {project.image_url ? (
-                      <img src={project.image_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                      <img src={project.image_url} alt="" className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-gray-400 text-sm">?</span>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-gray-400 text-xs sm:text-sm">?</span>
                       </div>
                     )}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-sm">{project.name}</h3>
-                      <p className="text-xs text-gray-500">{project.producer}</p>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-xs sm:text-sm truncate">{project.name}</h3>
+                      <p className="text-[10px] sm:text-xs text-gray-500 truncate">{project.producer}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium text-white ${getStatusColor(project.status)}`}>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-medium text-white ${getStatusColor(project.status)}`}>
                       {project.status}
                     </span>
                     {project.isPast && (
-                      <span className="text-xs text-gray-500">{occupancy.toFixed(0)}% ocup.</span>
+                      <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:inline">{occupancy.toFixed(0)}% ocup.</span>
                     )}
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900 text-sm">{formatCurrency(totalRevenue)}</p>
-                      <p className="text-xs text-gray-500">{eventCount} evento{eventCount !== 1 ? 's' : ''}</p>
+                    <div className="text-right hidden sm:block">
+                      <p className="font-semibold text-gray-900 text-xs sm:text-sm">{formatCurrency(totalRevenue)}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500">{eventCount} evento{eventCount !== 1 ? 's' : ''}</p>
                     </div>
                     <ActionsMenu
                       onEdit={() => handleEdit(project)}
@@ -903,7 +903,7 @@ export default function EventsPage() {
 
         {/* Empty State */}
         {filteredProjects.length === 0 && !loading && (
-          <div className="rounded-lg bg-white p-12 text-center shadow-md">
+          <div className="rounded-lg bg-white p-8 sm:p-12 text-center shadow-md">
             <p className="text-gray-500 mb-2">
               No hay eventos {emptyLabel}
             </p>

@@ -212,27 +212,27 @@ export default function AdminPage() {
   const showTeamOnboarding = usuarios.length < 3;
 
   return (
-    <div className="bg-[#f8f6f6] p-4 max-w-7xl mx-auto">
-      <h1 className="text-xl font-extrabold mb-4">Administración</h1>
+    <div className="bg-[#f8f6f6] p-3 sm:p-4 max-w-7xl mx-auto">
+      <h1 className="text-lg sm:text-xl font-extrabold mb-4">Administración</h1>
 
       {/* Roles + Equipo row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4">
         {/* Roles Section */}
-        <div className="bg-white rounded-xl p-4">
+        <div className="bg-white rounded-xl p-3 sm:p-4">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-extrabold text-base">Roles del Sistema</h2>
-            <button onClick={() => setShowRoleManage(true)} className="px-3 py-1.5 rounded-lg text-white text-xs font-bold" style={{ backgroundColor: ACCENT }}>Gestionar</button>
+            <h2 className="font-extrabold text-sm sm:text-base">Roles del Sistema</h2>
+            <button onClick={() => setShowRoleManage(true)} className="px-3 py-1.5 rounded-lg text-white text-xs font-bold hover:opacity-90 transition-opacity" style={{ backgroundColor: ACCENT }}>Gestionar</button>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {Object.entries(roleDefinitions).map(([key, role]) => (
-              <div key={key} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => setShowRoleDetail(key)}>
-                <div className="flex items-center gap-3">
-                  <span className={`w-3 h-3 rounded-full ${role.color}`}></span>
-                  <div className="flex-1">
-                    <p className="font-extrabold text-sm">{role.name}</p>
-                    <p className="text-xs text-gray-500">{role.description}</p>
+              <div key={key} className="border border-gray-200 rounded-lg p-2 sm:p-3 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => setShowRoleDetail(key)}>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className={`w-3 h-3 rounded-full ${role.color} flex-shrink-0`}></span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-extrabold text-xs sm:text-sm">{role.name}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 truncate">{role.description}</p>
                   </div>
-                  <span className="text-xs text-gray-400">{countPermissions(role.permissions)} permisos</span>
+                  <span className="text-[10px] sm:text-xs text-gray-400 flex-shrink-0">{countPermissions(role.permissions)} permisos</span>
                 </div>
               </div>
             ))}
@@ -240,47 +240,49 @@ export default function AdminPage() {
         </div>
 
         {/* Team Section */}
-        <div className="bg-white rounded-xl p-4">
+        <div className="bg-white rounded-xl p-3 sm:p-4">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-extrabold text-base">Equipo</h2>
-            <button onClick={() => setShowInvite(true)} className="px-3 py-1.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: ACCENT }}>+ Invitar</button>
+            <h2 className="font-extrabold text-sm sm:text-base">Equipo</h2>
+            <button onClick={() => setShowInvite(true)} className="px-3 py-1.5 rounded-lg text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity" style={{ backgroundColor: ACCENT }}>+ Invitar</button>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b text-xs">
-                <th className="pb-2 font-bold">Nombre</th><th className="pb-2 font-bold">Rol</th><th className="pb-2 font-bold">Acceso</th><th className="pb-2 font-bold">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [1, 2, 3].map((i) => <SkeletonRow key={i} cols={4} />)
-              ) : usuarios.length > 0 ? (
-                usuarios.map((u) => (
-                  <tr key={u.id} className="border-b last:border-0">
-                    <td className="py-1.5 pr-2">
-                      <div className="font-bold text-sm leading-tight">{u.nombre}</div>
-                      <div className="text-xs text-gray-400 truncate max-w-[140px]">{u.email}</div>
-                    </td>
-                    <td className="py-1.5">
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${roleDefinitions[u.rol]?.color || 'bg-gray-500'}`}>
-                        {roleDefinitions[u.rol]?.name || u.rol}
-                      </span>
-                    </td>
-                    <td className="py-1.5 text-gray-400 text-xs">{formatRelativeTime(u.ultimoAcceso)}</td>
-                    <td className="py-1.5"><span className={`inline-block w-2 h-2 rounded-full ${u.activo ? 'bg-green-500' : 'bg-gray-400'}`} /></td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan={4} className="py-4 text-center text-gray-400 text-sm">No hay miembros</td></tr>
-              )}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b text-xs">
+                  <th className="pb-2 font-bold">Nombre</th><th className="pb-2 font-bold">Rol</th><th className="pb-2 font-bold hidden sm:table-cell">Acceso</th><th className="pb-2 font-bold">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  [1, 2, 3].map((i) => <SkeletonRow key={i} cols={4} />)
+                ) : usuarios.length > 0 ? (
+                  usuarios.map((u) => (
+                    <tr key={u.id} className="border-b last:border-0">
+                      <td className="py-1.5 pr-2">
+                        <div className="font-bold text-xs sm:text-sm leading-tight truncate max-w-[100px] sm:max-w-none">{u.nombre}</div>
+                        <div className="text-[10px] sm:text-xs text-gray-400 truncate max-w-[100px] sm:max-w-[140px]">{u.email}</div>
+                      </td>
+                      <td className="py-1.5">
+                        <span className={`px-1 sm:px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold text-white ${roleDefinitions[u.rol]?.color || 'bg-gray-500'}`}>
+                          {roleDefinitions[u.rol]?.name || u.rol}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-gray-400 text-xs hidden sm:table-cell">{formatRelativeTime(u.ultimoAcceso)}</td>
+                      <td className="py-1.5"><span className={`inline-block w-2 h-2 rounded-full ${u.activo ? 'bg-green-500' : 'bg-gray-400'}`} /></td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan={4} className="py-4 text-center text-gray-400 text-sm">No hay miembros</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {/* Team onboarding prompt */}
           {showTeamOnboarding && !loading && (
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-sm text-gray-400 font-medium">Invita a tu equipo para colaborar</p>
-              <p className="text-xs text-gray-300 mt-1">Los gerentes pueden supervisar eventos. Los taquilleros pueden escanear boletos.</p>
+              <p className="text-xs sm:text-sm text-gray-400 font-medium">Invita a tu equipo para colaborar</p>
+              <p className="text-[10px] sm:text-xs text-gray-300 mt-1">Los gerentes pueden supervisar eventos. Los taquilleros pueden escanear boletos.</p>
             </div>
           )}
         </div>
@@ -289,9 +291,9 @@ export default function AdminPage() {
       {/* Auditoría — collapsed by default */}
       <div className="mb-4">
         {!auditExpanded ? (
-          <div className="bg-white rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-white rounded-xl p-3 sm:p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="font-extrabold text-base">Auditoría</h2>
+              <h2 className="font-extrabold text-sm sm:text-base">Auditoría</h2>
               <span className="text-xs text-gray-400">{logs.length} acciones registradas</span>
             </div>
             <button
@@ -302,14 +304,14 @@ export default function AdminPage() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-xl p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="font-extrabold text-base">Auditoría</h2>
+          <div className="bg-white rounded-xl p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+              <h2 className="font-extrabold text-sm sm:text-base">Auditoría</h2>
               <div className="flex gap-2">
                 <select
                   value={logFilter}
                   onChange={e => setLogFilter(e.target.value)}
-                  className="px-2 py-1 border border-gray-200 rounded text-xs"
+                  className="px-2 py-1 border border-gray-200 rounded text-xs flex-1 sm:flex-none"
                 >
                   <option value="">Todas las acciones</option>
                   <option value="login">Inicios de sesión</option>
@@ -326,8 +328,8 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
-            <div className="max-h-[400px] overflow-y-auto">
-              <table className="w-full text-sm">
+            <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
+              <table className="w-full text-xs sm:text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b text-xs">
                     <th className="pb-2 font-bold">Fecha</th><th className="pb-2 font-bold">Usuario</th><th className="pb-2 font-bold">Acción</th>
@@ -339,9 +341,9 @@ export default function AdminPage() {
                   ) : logs.length > 0 ? (
                     logs.map((log, i) => (
                       <tr key={i} className="border-b last:border-0">
-                        <td className="py-1.5 text-gray-400 font-mono text-xs whitespace-nowrap">{log.timestamp}</td>
-                        <td className="py-1.5 text-xs truncate max-w-[120px] font-bold">{log.usuario}</td>
-                        <td className="py-1.5 text-xs text-gray-600">{log.accion}</td>
+                        <td className="py-1.5 text-gray-400 font-mono text-[10px] sm:text-xs whitespace-nowrap">{log.timestamp}</td>
+                        <td className="py-1.5 text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-[120px] font-bold">{log.usuario}</td>
+                        <td className="py-1.5 text-[10px] sm:text-xs text-gray-600">{log.accion}</td>
                       </tr>
                     ))
                   ) : (
@@ -355,9 +357,9 @@ export default function AdminPage() {
       </div>
 
       {/* Settings — grouped into cards with inline edit */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         {/* General */}
-        <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <div className="bg-white rounded-xl p-3 sm:p-4 border border-gray-100">
           <h3 className="font-extrabold text-sm mb-3">General</h3>
           <div className="space-y-3">
             {generalSettings.map(s => (
@@ -378,10 +380,10 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-sm font-bold">{s.value}</p>
+                    <p className="text-sm font-bold truncate mr-2">{s.value}</p>
                     <button
                       onClick={() => { setEditingSettingKey(s.key); setEditingValue(s.value); }}
-                      className="text-xs text-[#E63946] hover:underline"
+                      className="text-xs text-[#E63946] hover:underline flex-shrink-0"
                     >
                       Editar
                     </button>
@@ -393,7 +395,7 @@ export default function AdminPage() {
         </div>
 
         {/* Notificaciones */}
-        <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <div className="bg-white rounded-xl p-3 sm:p-4 border border-gray-100">
           <h3 className="font-extrabold text-sm mb-3">Notificaciones</h3>
           <div className="space-y-3">
             {notifSettings.map(s => (
@@ -414,7 +416,7 @@ export default function AdminPage() {
         </div>
 
         {/* Operaciones */}
-        <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <div className="bg-white rounded-xl p-3 sm:p-4 border border-gray-100">
           <h3 className="font-extrabold text-sm mb-3">Operaciones</h3>
           <div className="space-y-3">
             {opsSettings.map(s => (
@@ -452,19 +454,19 @@ export default function AdminPage() {
 
       {/* Role Detail Modal (click on a role card) */}
       {showRoleDetail && roleDefinitions[showRoleDetail] && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowRoleDetail(null)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowRoleDetail(null)}>
+          <div className="bg-white rounded-xl p-4 sm:p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <span className={`w-4 h-4 rounded-full ${roleDefinitions[showRoleDetail].color}`}></span>
-              <h3 className="text-lg font-extrabold">{roleDefinitions[showRoleDetail].name}</h3>
+              <h3 className="text-base sm:text-lg font-extrabold">{roleDefinitions[showRoleDetail].name}</h3>
             </div>
-            <p className="text-sm text-gray-600 mb-4">{roleDefinitions[showRoleDetail].description}</p>
+            <p className="text-xs sm:text-sm text-gray-600 mb-4">{roleDefinitions[showRoleDetail].description}</p>
 
             <h4 className="font-extrabold text-sm mb-2">Permisos:</h4>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {Object.entries(roleDefinitions[showRoleDetail].permissions).map(([cat, perms]) =>
                 perms.map((permission, index) => (
-                  <div key={`${cat}-${index}`} className="flex items-center gap-2 text-sm">
+                  <div key={`${cat}-${index}`} className="flex items-center gap-2 text-xs sm:text-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                     <span>{permission}</span>
                   </div>
@@ -486,17 +488,17 @@ export default function AdminPage() {
 
       {/* Role Management Modal */}
       {showRoleManage && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowRoleManage(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-extrabold mb-4">Gestionar Roles y Permisos</h3>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowRoleManage(false)}>
+          <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base sm:text-lg font-extrabold mb-4">Gestionar Roles y Permisos</h3>
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {Object.entries(roleDefinitions).map(([roleKey, role]) => (
-                <div key={roleKey} className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center gap-3 mb-3">
+                <div key={roleKey} className="border border-gray-200 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-3">
                     <span className={`w-3 h-3 rounded-full ${role.color}`}></span>
-                    <h4 className="font-extrabold text-sm">{role.name}</h4>
-                    <span className="text-xs text-gray-400">{role.description}</span>
+                    <h4 className="font-extrabold text-xs sm:text-sm">{role.name}</h4>
+                    <span className="text-[10px] sm:text-xs text-gray-400 truncate">{role.description}</span>
                   </div>
 
                   {Object.entries(allPermissions).map(([category, perms]) => {
@@ -562,9 +564,9 @@ export default function AdminPage() {
 
       {/* Invite Modal */}
       {showInvite && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowInvite(false)}>
-          <div className="bg-white rounded-xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-extrabold text-base mb-3">Invitar usuario</h3>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowInvite(false)}>
+          <div className="bg-white rounded-xl p-4 sm:p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-extrabold text-sm sm:text-base mb-3">Invitar usuario</h3>
             <input id="invite-email" type="email" placeholder="Email" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]" />
             <select id="invite-role" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-[#E63946] focus:border-[#E63946]">
               <option value="ADMIN">Administrador</option>
