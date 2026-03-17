@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import Image from "next/image";
 import SummaryPage from "@/pages/SummaryPage";
 import FinancePage from "@/pages/FinancePage";
 import EventsPage from "@/pages/EventsPage";
@@ -66,9 +67,15 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("resumen");
   const [loading, setLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
+    // Set minimum splash display time of 2.5 seconds
+    const splashTimer = setTimeout(() => {
+      if (mounted) setSplashDone(true);
+    }, 2500);
 
     const init = async () => {
       // Middleware already verified auth — just get the session
@@ -92,7 +99,10 @@ export default function Home() {
     };
 
     init();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      clearTimeout(splashTimer);
+    };
   }, [router]);
 
   const handleLogout = async () => {
@@ -102,17 +112,19 @@ export default function Home() {
     router.push("/login");
   };
 
-  if (loading || !user) {
+  if (loading || !user || !splashDone) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center relative overflow-hidden">
         {/* Background image with Ken Burns effect */}
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url(/splash-bg.jpg)',
-            animation: 'kenBurns 12s ease-in-out infinite alternate',
-          }}
-        />
+        <div className="absolute inset-0" style={{ animation: 'kenBurns 12s ease-in-out infinite alternate' }}>
+          <Image
+            src="/splash-bg.jpg"
+            alt="Concert background"
+            fill
+            className="object-cover"
+            priority
+          />
+        </div>
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-black/60" />
 
