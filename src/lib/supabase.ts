@@ -773,3 +773,83 @@ export async function fetchAllEscalations(): Promise<Escalation[]> {
     throw error;
   }
 }
+
+// ─── Paolo's Seat Architecture ───
+
+export async function fetchVenueSeats(venueId: string): Promise<VenueSeat[]> {
+  try {
+    return await supabaseFetch<VenueSeat[]>(`venue_seats?venue_id=eq.${venueId}&order=sort_order.asc`);
+  } catch (error) {
+    console.error('Error fetching venue seats:', error);
+    return [];
+  }
+}
+
+export async function fetchEventSections(eventId: string): Promise<EventSection[]> {
+  try {
+    return await supabaseFetch<EventSection[]>(`event_sections?event_id=eq.${eventId}&order=sort_order.asc`);
+  } catch (error) {
+    console.error('Error fetching event sections:', error);
+    return [];
+  }
+}
+
+export async function fetchEventSectionSeats(sectionId: string): Promise<EventSectionSeat[]> {
+  try {
+    return await supabaseFetch<EventSectionSeat[]>(`event_section_seats?event_section_id=eq.${sectionId}`);
+  } catch (error) {
+    console.error('Error fetching section seats:', error);
+    return [];
+  }
+}
+
+export async function fetchEventSectionSeatsForEvent(eventId: string): Promise<(EventSectionSeat & { section_name?: string })[]> {
+  try {
+    // First get sections for this event
+    const sections = await fetchEventSections(eventId);
+    if (sections.length === 0) return [];
+
+    // Then get all seats for all sections
+    const sectionIds = sections.map(s => s.id);
+    const filter = sectionIds.map(id => `event_section_id.eq.${id}`).join(',');
+    const seats = await supabaseFetch<EventSectionSeat[]>(`event_section_seats?or=(${filter})`);
+
+    // Attach section names
+    const sectionMap = new Map(sections.map(s => [s.id, s.name]));
+    return seats.map(seat => ({
+      ...seat,
+      section_name: sectionMap.get(seat.event_section_id) || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching event section seats:', error);
+    return [];
+  }
+}
+
+// ─── Dispersions (Paolo's payout table) ───
+
+export interface Dispersion {
+  id: string;
+  event_id: string;
+  period_start: string;
+  period_end: string;
+  gross_revenue: number;
+  discounts: number;
+  refunds: number;
+  net_revenue: number;
+  platform_fee: number;
+  ad_spend: number;
+  carried_over: number;
+  net_payout: number;
+  status: string;
+  created_at: string;
+}
+
+export async function fetchDispersions(): Promise<Dispersion[]> {
+  try {
+    return await supabaseFetch<Dispersion[]>('dispersions?order=created_at.desc');
+  } catch (error) {
+    console.error('Error fetching dispersions:', error);
+    return [];
+  }
+}
