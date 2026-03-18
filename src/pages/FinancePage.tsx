@@ -224,19 +224,38 @@ export default function FinancePage() {
     const filteredSchedules = selectedEvent ? rawSchedules.filter(s => s.event_id === selectedEvent) : rawSchedules;
 
     // Event revenues from sales summary (REAL DATA)
-    // Detect duplicate event names to show venue for disambiguation
-    const nameCount = new Map<string, number>();
-    filteredSalesSummary.forEach(s => nameCount.set(s.event_name, (nameCount.get(s.event_name) || 0) + 1));
+    // Aggregate events with same name (different venues) into one row
+    const eventAggMap = new Map<string, { event_ids: string[]; event_name: string; venues: { venue_name: string; event_id: string; revenue: number; orders: number; tickets: number }[]; revenue: number; orders: number; tickets: number; image_url?: string }>();
+    filteredSalesSummary.forEach(s => {
+      const existing = eventAggMap.get(s.event_name);
+      if (existing) {
+        existing.event_ids.push(s.event_id);
+        existing.venues.push({ venue_name: s.venue_name || '', event_id: s.event_id, revenue: s.total_revenue, orders: s.total_orders, tickets: s.total_tickets_sold });
+        existing.revenue += s.total_revenue;
+        existing.orders += s.total_orders;
+        existing.tickets += s.total_tickets_sold;
+      } else {
+        eventAggMap.set(s.event_name, {
+          event_ids: [s.event_id],
+          event_name: s.event_name,
+          venues: [{ venue_name: s.venue_name || '', event_id: s.event_id, revenue: s.total_revenue, orders: s.total_orders, tickets: s.total_tickets_sold }],
+          revenue: s.total_revenue,
+          orders: s.total_orders,
+          tickets: s.total_tickets_sold,
+          image_url: eventMap.get(s.event_id)?.image_url,
+        });
+      }
+    });
 
-    const eventRevenues = filteredSalesSummary.map(s => ({
-      event_id: s.event_id,
-      event_name: s.event_name,
-      venue_name: s.venue_name || '',
-      show_venue: (nameCount.get(s.event_name) || 0) > 1, // show venue when name is duplicated
-      revenue: s.total_revenue,
-      orders: s.total_orders,
-      tickets: s.total_tickets_sold,
-      image_url: eventMap.get(s.event_id)?.image_url
+    const eventRevenues = Array.from(eventAggMap.values()).map(e => ({
+      event_id: e.event_ids[0], // primary event_id for lookups
+      event_ids: e.event_ids,
+      event_name: e.event_name,
+      venues: e.venues,
+      revenue: e.revenue,
+      orders: e.orders,
+      tickets: e.tickets,
+      image_url: e.image_url,
     })).sort((a, b) => b.revenue - a.revenue);
 
     // --- Scorecard using Sales Summary (REAL DATA) ---
@@ -456,16 +475,14 @@ export default function FinancePage() {
       totalRevenue: totalComissionRevenue,
       dulosCommission,
       producerShare,
-      events: filteredSalesSummary.map(s => ({
-        event_id: s.event_id,
-        event_name: s.event_name,
-        venue_name: s.venue_name || '',
-        show_venue: (nameCount.get(s.event_name) || 0) > 1,
-        revenue: s.total_revenue,
-        commission: s.total_revenue * 0.15,
-        producer: s.total_revenue * 0.85,
-        tickets: s.total_tickets_sold,
-        image_url: eventMap.get(s.event_id)?.image_url
+      events: Array.from(eventAggMap.values()).map(e => ({
+        event_id: e.event_ids[0],
+        event_name: e.event_name,
+        revenue: e.revenue,
+        commission: e.revenue * 0.15,
+        producer: e.revenue * 0.85,
+        tickets: e.tickets,
+        image_url: e.image_url,
       })).sort((a, b) => b.revenue - a.revenue)
     };
 
@@ -526,7 +543,7 @@ export default function FinancePage() {
   }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange]);
 
   // Handle revenue event drill-down
-  const handleRevenueEventClick = async (eventId: string) => {
+  const handleRevenueEventClick = async (eventId: string, eventIds?: string[]) => {
     if (expandedRevenueEvent === eventId) {
       setExpandedRevenueEvent(null);
       setExpandedEventZones([]);
@@ -534,10 +551,11 @@ export default function FinancePage() {
       return;
     }
     setExpandedRevenueEvent(eventId);
-    // Fetch zones for this event
-    const zones = rawZones.filter(z => z.event_id === eventId);
+    // Fetch zones for ALL event_ids (aggregated events)
+    const ids = new Set(eventIds || [eventId]);
+    const zones = rawZones.filter(z => ids.has(z.event_id));
     setExpandedEventZones(zones);
-    // Try to fetch event sections (Paolo's seat architecture)
+    // Try to fetch event sections (Paolo's seat architecture) for primary
     try {
       const sections = await fetchEventSections(eventId);
       setExpandedEventSections(sections);
@@ -804,15 +822,16 @@ export default function FinancePage() {
                     const isExpanded = expandedRevenueEvent === event.event_id;
                     const eventObj = events.find(e => e.id === event.event_id);
                     const eventType = eventObj?.event_type || 'general';
-                    // Capacity from schedules
-                    const eventSchedules = schedulesDisplay.filter(s => s.eventId === event.event_id);
+                    // Capacity from schedules (aggregate all event_ids)
+                    const eIds = new Set(event.event_ids || [event.event_id]);
+                    const eventSchedules = schedulesDisplay.filter(s => s.eventId && eIds.has(s.eventId));
                     const totalCap = eventSchedules.reduce((s, sc) => s + sc.capacity, 0);
                     const totalSold = eventSchedules.reduce((s, sc) => s + sc.sold, 0);
                     const occPct = totalCap > 0 ? Math.round((totalSold / totalCap) * 100) : 0;
                     const occBadge = occPct > 80 ? { cls: 'bg-red-500', label: 'CRÍTICO' } : occPct >= 50 ? { cls: 'bg-yellow-500', label: 'ALTO' } : { cls: 'bg-green-500', label: 'NORMAL' };
                     return (
                       <React.Fragment key={event.event_id}>
-                      <tr onClick={() => handleRevenueEventClick(event.event_id)} className={`cursor-pointer ${isExpanded ? 'bg-red-50' : ''}`}>
+                      <tr onClick={() => handleRevenueEventClick(event.event_id, event.event_ids)} className={`cursor-pointer ${isExpanded ? 'bg-red-50' : ''}`}>
                         <td>
                           <div className="flex items-center gap-2">
                             {event.image_url && (
@@ -820,8 +839,8 @@ export default function FinancePage() {
                             )}
                             <div>
                               <span className="font-bold truncate">{event.event_name}</span>
-                              {event.show_venue && event.venue_name && (
-                                <span className="ml-1 text-[10px] text-gray-400">· {event.venue_name}</span>
+                              {event.venues && event.venues.length > 1 && (
+                                <span className="ml-1 text-[10px] text-gray-400">{event.venues.length} recintos</span>
                               )}
                               <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{eventType}</span>
                             </div>
@@ -845,6 +864,32 @@ export default function FinancePage() {
                         <tr>
                           <td colSpan={8} className="bg-gray-50 p-4">
                             <div className="space-y-3">
+                              {/* Venue breakdown (when aggregated) */}
+                              {event.venues && event.venues.length > 1 && (
+                                <div>
+                                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Por Recinto</p>
+                                  <table className="w-full text-xs">
+                                    <thead className="bg-[#1a1a2e] text-white">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-bold">Recinto</th>
+                                        <th className="px-3 py-2 text-right text-xs font-bold">Boletos</th>
+                                        <th className="px-3 py-2 text-right text-xs font-bold">Órdenes</th>
+                                        <th className="px-3 py-2 text-right text-xs font-bold">Revenue</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {event.venues.map((v, vi) => (
+                                        <tr key={vi} className="border-b border-gray-100 hover:bg-gray-50">
+                                          <td className="px-3 py-2 font-bold">{v.venue_name || 'Sin recinto'}</td>
+                                          <td className="px-3 py-2 text-right">{v.tickets}</td>
+                                          <td className="px-3 py-2 text-right">{v.orders}</td>
+                                          <td className="px-3 py-2 text-right font-bold">{fmtCurrency(v.revenue)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                               {/* Zone revenue breakdown */}
                               {expandedEventZones.length > 0 && (
                                 <div>
@@ -1177,9 +1222,6 @@ export default function FinancePage() {
                           <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
                         )}
                         <span className="font-bold">{event.event_name}</span>
-                        {event.show_venue && event.venue_name && (
-                          <span className="ml-1 text-[10px] text-gray-400">· {event.venue_name}</span>
-                        )}
                       </div>
                     </td>
                     <td className="text-right">{event.tickets.toLocaleString()}</td>
