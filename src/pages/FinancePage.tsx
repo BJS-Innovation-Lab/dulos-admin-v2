@@ -867,8 +867,8 @@ export default function FinancePage() {
                         <tr>
                           <td colSpan={8} className="bg-gray-50 p-4">
                             <div className="space-y-3">
-                              {/* Venue breakdown (when aggregated) */}
-                              {event.venues && event.venues.length > 1 && (
+                              {/* Venue breakdown — always show which venue(s) */}
+                              {event.venues && event.venues.length >= 1 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Por Recinto</p>
                                   <table className="w-full text-xs">
