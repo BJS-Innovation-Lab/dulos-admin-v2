@@ -905,50 +905,7 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Resumen por Zona + Donut — compact row */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-1">
-            {zoneRevenues.length > 0 ? zoneRevenues.slice(0, 3).map(z => (
-              <div key={z.zone} className="flex-1 p-2 bg-white rounded-lg border border-gray-200">
-                <p className="text-[11px] font-bold text-gray-500 uppercase">{z.zone}</p>
-                <p className="text-base font-extrabold text-gray-900">{fmtCurrency(z.revenue)}</p>
-              </div>
-            )) : (
-              <div className="flex-1 text-center text-gray-500 py-2 text-sm">No hay datos de zonas</div>
-            )}
-            {donutData.length > 0 && (
-              <div className="flex-shrink-0 flex items-center gap-2 justify-center sm:justify-start">
-                <div className="relative">
-                  <PieChart width={120} height={120}>
-                    <Pie
-                      data={donutData}
-                      cx={60}
-                      cy={60}
-                      innerRadius={35}
-                      outerRadius={52}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {donutData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => fmtCurrency(Number(v))} />
-                  </PieChart>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-[10px] font-bold text-gray-700">{fmtCurrency(donutTotal)}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {donutData.map(d => (
-                    <span key={d.name} className="flex items-center gap-1 text-[11px] text-gray-600">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                      {d.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Zone revenue info now lives inside drill-down per event — no more loose blocks/donut */}
 
           {/* Daily Revenue Area Chart */}
           {dailyRevenueData.length >= 3 && (
@@ -985,74 +942,81 @@ export default function FinancePage() {
       {/* ====== CAPACIDAD TAB ====== */}
       {activeTab === 'capacidad' && (
         <div className="space-y-4 animate-fade-in">
-          <div className="section-card">
-            <div className="section-card-header flex-wrap gap-2">
-              <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <span className="section-card-title">Ocupacion por Funcion</span>
-              <div className="flex flex-wrap gap-2 sm:gap-4 text-[10px] sm:text-xs ml-auto">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500" />Critico
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-yellow-500" />Alto
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500" />Normal
-                </span>
-              </div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-gray-700">Ocupación por Función</span>
+            <div className="flex gap-3 text-[10px]">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Crítico (&gt;80%)</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" />Alto (50-80%)</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Normal (&lt;50%)</span>
             </div>
           </div>
-
-          <CapacityBars
-            schedules={schedulesDisplay}
-            zonesByEvent={zonesByEvent}
-            expandedIndex={expandedCapacity}
-            onToggle={(index) => setExpandedCapacity(prev => prev === index ? null : index)}
-          />
-
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
-            <div className="metric-card">
-              <p className="metric-card-title">Eventos Criticos</p>
-              <p className="metric-card-value text-red-500">{capacityStats.critical}</p>
-              <p className="metric-card-subtitle">Ocupacion &gt;80%</p>
-              <div className="metric-card-icon bg-red-100">
-                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-            </div>
-            <div className="metric-card">
-              <p className="metric-card-title">Ocupacion Alta</p>
-              <p className="metric-card-value text-amber-500">{capacityStats.high}</p>
-              <p className="metric-card-subtitle">Entre 50-80%</p>
-              <div className="metric-card-icon bg-amber-100">
-                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-            </div>
-            <div className="metric-card">
-              <p className="metric-card-title">Ocupacion Normal</p>
-              <p className="metric-card-value text-emerald-500">{capacityStats.normal}</p>
-              <p className="metric-card-subtitle">&lt;50% ocupado</p>
-              <div className="metric-card-icon bg-emerald-100">
-                <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            </div>
-            <div className="metric-card">
-              <p className="metric-card-title">Capacidad Total</p>
-              <p className="metric-card-value">{capacityStats.totalCapacity.toLocaleString()}</p>
-              <p className="metric-card-subtitle">Asientos disponibles</p>
-              <div className="metric-card-icon bg-gray-100">
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Evento</th>
+                  <th>Fecha</th>
+                  <th className="text-right">Capacidad</th>
+                  <th className="text-right">Vendidos</th>
+                  <th className="text-right">Disponibles</th>
+                  <th className="text-right">Ocupación</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedulesDisplay.length > 0 ? schedulesDisplay.map((s, i) => {
+                  const disponibles = s.capacity - s.sold;
+                  const badge = s.percentage > 80 ? { cls: 'bg-red-500', label: 'CRÍTICO' } : s.percentage >= 50 ? { cls: 'bg-yellow-500', label: 'ALTO' } : { cls: 'bg-green-500', label: 'NORMAL' };
+                  const isExp = expandedCapacity === i;
+                  const zones = s.eventId && zonesByEvent ? zonesByEvent[s.eventId] : undefined;
+                  return (
+                    <React.Fragment key={i}>
+                      <tr className={`cursor-pointer ${isExp ? 'bg-red-50' : ''}`} onClick={() => setExpandedCapacity(prev => prev === i ? null : i)}>
+                        <td className="font-bold">{s.name}</td>
+                        <td className="text-xs text-gray-500">{new Date(s.date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                        <td className="text-right">{s.capacity.toLocaleString()}</td>
+                        <td className="text-right font-bold">{s.sold.toLocaleString()}</td>
+                        <td className="text-right">{disponibles.toLocaleString()}</td>
+                        <td className="text-right font-bold">{Math.round(s.percentage)}%</td>
+                        <td>
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${badge.cls}`}>{badge.label}</span>
+                        </td>
+                      </tr>
+                      {isExp && zones && zones.length > 0 && (
+                        <tr>
+                          <td colSpan={7} className="bg-gray-50 p-3">
+                            <table className="w-full text-xs">
+                              <thead className="bg-[#1a1a2e] text-white">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-bold">Zona</th>
+                                  <th className="px-3 py-2 text-right text-xs font-bold">Vendidos</th>
+                                  <th className="px-3 py-2 text-right text-xs font-bold">Total</th>
+                                  <th className="px-3 py-2 text-right text-xs font-bold">%</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {zones.map((z, zi) => (
+                                  <tr key={zi} className="border-b border-gray-100">
+                                    <td className="px-3 py-1.5 font-bold">{z.zone_name}</td>
+                                    <td className="px-3 py-1.5 text-right">{z.sold}</td>
+                                    <td className="px-3 py-1.5 text-right">{z.total}</td>
+                                    <td className="px-3 py-1.5 text-right">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${z.percentage > 80 ? 'bg-red-500' : z.percentage >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>{Math.round(z.percentage)}%</span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                }) : (
+                  <tr><td colSpan={7} className="text-center py-6 text-gray-400">No hay funciones programadas</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
