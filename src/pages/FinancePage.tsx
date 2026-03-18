@@ -1057,8 +1057,8 @@ export default function FinancePage() {
 
           <div className="section-card-body p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#1E293B]">
+              <table className="data-table">
+                <thead>
                   <tr>
                     <SortHeader col="id" label="ID" />
                     <SortHeader col="date" label="Fecha" />
@@ -1076,13 +1076,13 @@ export default function FinancePage() {
                 <tbody>
                   {processedTransactions.items.length > 0 ? processedTransactions.items.map(tx => (
                     <tr key={tx.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-mono text-[#EF4444] font-bold">{tx.id}</td>
+                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-mono text-[#EF4444] font-bold">{/^[0-9a-fA-F]{8}-/.test(tx.id) ? tx.id.substring(0, 8) + '…' : tx.id}</td>
                       <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-500 whitespace-nowrap">
                         {new Date(tx.date).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px]">
-                        <div className="font-bold truncate max-w-[100px] sm:max-w-none">{tx.customer_name}</div>
-                        <div className="text-gray-500 text-[10px] sm:text-xs truncate max-w-[100px] sm:max-w-none">{tx.customer_email}</div>
+                        <div className="font-bold truncate max-w-[100px] sm:max-w-none">{tx.customer_name || 'Sin nombre'}</div>
+                        <div className="text-gray-500 text-[10px] sm:text-xs truncate max-w-[100px] sm:max-w-none">{tx.customer_email || '—'}</div>
                       </td>
                       <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600 hidden md:table-cell">{tx.event_name}</td>
                       <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600 hidden lg:table-cell">{tx.zone_name}</td>
