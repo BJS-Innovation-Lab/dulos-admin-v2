@@ -370,10 +370,10 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm">
+            <table className="data-table">
               <thead>
-                <tr className="text-left text-gray-500 border-b text-xs">
-                  <th className="pb-2 font-bold">Nombre</th><th className="pb-2 font-bold">Rol</th><th className="pb-2 font-bold hidden sm:table-cell">Acceso</th><th className="pb-2 font-bold">Estado</th>
+                <tr>
+                  <th>Nombre</th><th>Rol</th><th className="hidden sm:table-cell">Último Acceso</th><th>Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -381,27 +381,31 @@ export default function AdminPage() {
                   [1, 2, 3].map((i) => <SkeletonRow key={i} cols={4} />)
                 ) : usuarios.length > 0 ? (
                   usuarios.map((u) => (
-                    <tr key={u.id} className="border-b last:border-0">
-                      <td className="py-1.5 pr-2">
-                        <div className="font-bold text-xs sm:text-sm leading-tight truncate max-w-[100px] sm:max-w-none">{u.nombre}</div>
-                        <div className="text-[10px] sm:text-xs text-gray-400 truncate max-w-[100px] sm:max-w-[140px]">{u.email}</div>
+                    <tr key={u.id}>
+                      <td>
+                        <div className="font-bold leading-tight truncate max-w-[100px] sm:max-w-none">{u.nombre}</div>
+                        <div className="text-xs text-gray-400 truncate max-w-[100px] sm:max-w-[140px]">{u.email}</div>
                       </td>
-                      <td className="py-1.5">
-                        <span className={`px-1 sm:px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold text-white ${roleDefinitions[u.rol]?.color || 'bg-gray-500'}`}>
+                      <td>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold text-white ${roleDefinitions[u.rol]?.color || 'bg-gray-500'}`}>
                           {roleDefinitions[u.rol]?.name || u.rol}
                         </span>
                       </td>
-                      <td className="py-1.5 text-gray-400 text-xs hidden sm:table-cell">
+                      <td className="hidden sm:table-cell">
                         <div className="flex flex-col">
                           <span>{formatRelativeTime(u.ultimoAcceso)}</span>
-                          <span className="text-[10px] text-gray-300">{new Date(u.ultimoAcceso).toLocaleDateString('es-MX')}</span>
+                          <span className="text-xs text-gray-400">{new Date(u.ultimoAcceso).toLocaleDateString('es-MX')}</span>
                         </div>
                       </td>
-                      <td className="py-1.5"><span className={`inline-block w-2 h-2 rounded-full ${u.activo ? 'bg-green-500' : 'bg-gray-400'}`} /></td>
+                      <td>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${u.activo ? 'bg-green-500' : 'bg-gray-400'}`}>
+                          {u.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={4} className="py-4 text-center text-gray-400 text-sm">No hay miembros</td></tr>
+                  <tr><td colSpan={4} className="text-center py-4">No hay miembros</td></tr>
                 )}
               </tbody>
             </table>
@@ -473,10 +477,10 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm">
+              <table className="data-table">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b text-xs">
-                    <th className="pb-2 font-bold">Fecha</th><th className="pb-2 font-bold">Usuario</th><th className="pb-2 font-bold">Acción</th>
+                  <tr>
+                    <th>Fecha</th><th>Usuario</th><th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
