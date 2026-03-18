@@ -427,10 +427,10 @@ export default function FinancePage() {
       .map(([device, count]) => ({ device, count }))
       .sort((a, b) => b.count - a.count);
 
-    // --- Commission calculations (10% for Dulos, 90% for producers) ---
+    // --- Commission calculations (15% for Dulos, 85% for producers) ---
     const totalComissionRevenue = filteredSalesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
-    const dulosCommission = totalComissionRevenue * 0.10;
-    const producerShare = totalComissionRevenue * 0.90;
+    const dulosCommission = totalComissionRevenue * 0.15;
+    const producerShare = totalComissionRevenue * 0.85;
 
     const commissionData = {
       totalRevenue: totalComissionRevenue,
@@ -440,8 +440,8 @@ export default function FinancePage() {
         event_id: s.event_id,
         event_name: s.event_name,
         revenue: s.total_revenue,
-        commission: s.total_revenue * 0.10,
-        producer: s.total_revenue * 0.90,
+        commission: s.total_revenue * 0.15,
+        producer: s.total_revenue * 0.85,
         tickets: s.total_tickets_sold,
         image_url: eventMap.get(s.event_id)?.image_url
       })).sort((a, b) => b.revenue - a.revenue)
@@ -1206,7 +1206,7 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <div className="metric-card">
-                  <p className="metric-card-title">Comisión Dulos (10%)</p>
+                  <p className="metric-card-title">Comisión Dulos (15%)</p>
                   <p className="metric-card-value text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
                   <p className="metric-card-subtitle">Para Dulos</p>
                   <div className="metric-card-icon bg-red-100">
@@ -1216,7 +1216,7 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <div className="metric-card">
-                  <p className="metric-card-title">Para Productor (90%)</p>
+                  <p className="metric-card-title">Para Productor (85%)</p>
                   <p className="metric-card-value text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
                   <p className="metric-card-subtitle">Para productores</p>
                   <div className="metric-card-icon bg-emerald-100">
@@ -1245,8 +1245,8 @@ export default function FinancePage() {
                     <tr>
                       <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Evento</th>
                       <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Ingresos</th>
-                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Comisión (10%)</th>
-                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Productor (90%)</th>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Comisión (15%)</th>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Productor (85%)</th>
                       <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Boletos</th>
                     </tr>
                   </thead>
