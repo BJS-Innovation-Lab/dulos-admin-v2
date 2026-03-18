@@ -880,48 +880,49 @@ export default function OpsPage() {
                 </button>
               </div>
 
-              <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Tipo</th>
+                      <th>Descuento</th>
+                      <th className="text-right">Usos</th>
+                      <th className="text-right">Máximo</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                 {cupones.map(c => {
-                  const usagePercent = c.max_uses ? (c.used_count / c.max_uses) * 100 : 0
-                  const barColor = usagePercent < 50 ? 'bg-green-500' : usagePercent < 80 ? 'bg-yellow-500' : 'bg-red-500'
-                  const totalDiscountValue = c.discount_type === 'fixed'
-                    ? c.used_count * c.discount_value
-                    : c.used_count * (c.discount_value * 0.01 * 300) // estimated based on avg ticket price
+                  const discountVal = c.discount_value || 0
+                  const usedCount = c.used_count || 0
+                  const discType = c.discount_type || 'flat'
+                  const discLabel = discType === 'percentage' ? `${discountVal}%` : `$${discountVal.toLocaleString()}`
 
                   return (
-                    <div key={c.id} className="bg-white rounded-lg p-4 border border-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-extrabold text-sm">{c.code}</span>
-                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 font-bold">
-                            {c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value}`}
-                          </span>
-                          <span className={`w-2 h-2 rounded-full ${c.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
-                        </div>
-                        <div className="text-right text-xs text-gray-500">
-                          <p>Descuento total: <span className="font-bold">${totalDiscountValue.toLocaleString()}</span></p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${barColor}`}
-                            style={{ width: `${usagePercent}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-gray-600 whitespace-nowrap">
-                          {c.used_count}/{c.max_uses || '∞'} ({Math.round(usagePercent)}%)
+                    <tr key={c.id}>
+                      <td className="font-mono font-bold">{c.code}</td>
+                      <td>
+                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-100 text-gray-700">
+                          {discType === 'percentage' ? 'Porcentaje' : discType === 'bogo' ? 'BOGO' : 'Monto fijo'}
                         </span>
-                      </div>
-                    </div>
+                      </td>
+                      <td className="font-bold text-[#EF4444]">{discLabel}</td>
+                      <td className="text-right">{usedCount}</td>
+                      <td className="text-right">{c.max_uses || '∞'}</td>
+                      <td>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${c.is_active ? 'bg-green-500' : 'bg-gray-400'}`}>
+                          {c.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                    </tr>
                   )
                 })}
                 {cupones.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p>No hay cupones disponibles</p>
-                  </div>
+                  <tr><td colSpan={6} className="text-center py-8">No hay cupones disponibles</td></tr>
                 )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
