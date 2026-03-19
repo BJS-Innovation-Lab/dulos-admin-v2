@@ -734,12 +734,12 @@ export default function FinancePage() {
     setTxSort(prev => prev.col === col ? { col, asc: !prev.asc } : { col, asc: true });
   };
 
-  const SortHeader = ({ col, label }: { col: keyof Transaction; label: string }) => (
+  const SortHeader = ({ col, label, align = 'left' }: { col: keyof Transaction; label: string; align?: 'left' | 'right' | 'center' }) => (
     <th
-      className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap"
+      className={`${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap`}
       onClick={() => toggleSort(col)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end w-full' : ''}`}>
         {label}
         {txSort.col === col && (
           <svg className={`w-3 h-3 transition-transform ${txSort.asc ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20">
@@ -1264,7 +1264,7 @@ export default function FinancePage() {
                   <th className="cursor-pointer" onClick={() => toggleSort('customer_name')}>Cliente</th>
                   <th className="cursor-pointer hidden sm:table-cell" onClick={() => toggleSort('event_name')}>Evento</th>
                   <th className="text-right cursor-pointer" onClick={() => toggleSort('amount')}>
-                    <span className="inline-flex items-center gap-1">Monto{txSort.col === 'amount' && <span className={txSort.asc ? '' : 'rotate-180 inline-block'}>▲</span>}</span>
+                    <span className="inline-flex items-center gap-1 justify-end w-full">Monto{txSort.col === 'amount' && <span className={txSort.asc ? '' : 'rotate-180 inline-block'}>▲</span>}</span>
                   </th>
                   <th className="text-right hidden sm:table-cell">Boletos</th>
                   <th>Estado</th>

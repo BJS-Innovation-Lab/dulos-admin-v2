@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
@@ -187,6 +187,51 @@ const isPastDate = (dateStr: string): boolean => {
   return false;
 };
 
+/* ─── SVG Cache — prevents flickering from cache-control: no-cache ─── */
+const svgBlobCache = new Map<string, string>();
+
+function CachedSvgImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(svgBlobCache.get(src) || null);
+  const [loading, setLoading] = useState(!svgBlobCache.has(src));
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (svgBlobCache.has(src)) {
+      setBlobUrl(svgBlobCache.get(src)!);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(src)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        svgBlobCache.set(src, url);
+        setBlobUrl(url);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) { setError(true); setLoading(false); }
+      });
+    return () => { cancelled = true; };
+  }, [src]);
+
+  if (error) return null;
+  if (loading) return (
+    <div className={`${className || ''} flex items-center justify-center bg-gray-50 rounded animate-pulse`} style={{ minHeight: '120px' }}>
+      <div className="text-center">
+        <div className="w-6 h-6 border-2 border-gray-300 border-t-[#EF4444] rounded-full animate-spin mx-auto mb-1" />
+        <p className="text-[10px] text-gray-400">Cargando mapa...</p>
+      </div>
+    </div>
+  );
+  return <img src={blobUrl!} alt={alt} className={className} />;
+}
+
 /* ─── Skeleton ─── */
 
 function SkeletonRow() {
@@ -335,7 +380,7 @@ function ProjectModal({
                 <p className="text-gray-500">Capacidad: {selectedVenue.capacity?.toLocaleString()} · {selectedVenue.timezone === 'America/Mexico_City' ? 'CDMX' : selectedVenue.timezone?.replace('America/', '') || ''}</p>
                 {selectedVenue.has_seatmap && <span className="badge badge-reserved">Asientos Numerados</span>}
                 {selectedVenue.layout_svg_url && (
-                  <img src={selectedVenue.layout_svg_url} alt="Mapa" className="w-full max-h-32 object-contain rounded mt-2" />
+                  <CachedSvgImage src={selectedVenue.layout_svg_url} alt="Mapa" className="w-full max-h-32 object-contain rounded mt-2" />
                 )}
               </div>
             )}
@@ -1438,7 +1483,7 @@ export default function EventsPage() {
                       <td className="text-center">{geo || '—'}</td>
                       <td className="text-center font-bold">
                         {v.capacity?.toLocaleString() || '—'}
-                        {venueSeatCounts.get(v.id) ? <span className="block text-[9px] text-gray-400 font-normal">{venueSeatCounts.get(v.id)} seats</span> : null}
+                        {venueSeatCounts.get(v.id) ? <span className="block text-[9px] text-gray-400 font-normal">{venueSeatCounts.get(v.id)} asientos</span> : null}
                       </td>
                       <td className="hidden sm:table-cell text-center text-gray-500 text-[10px]">{v.timezone === 'America/Mexico_City' ? 'CDMX' : v.timezone?.replace('America/', '') || '—'}</td>
                       <td className="hidden sm:table-cell text-center">
@@ -1466,16 +1511,14 @@ export default function EventsPage() {
                               </div>
                               <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline">📍 Ver en Maps</a>
                             </div>
-                            {/* SVG Layout Map */}
+                            {/* SVG Layout Map — cached to prevent flickering */}
                             {v.layout_svg_url && (
                               <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 overflow-hidden">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Mapa del Recinto</p>
-                                <img
+                                <CachedSvgImage
                                   src={v.layout_svg_url}
                                   alt={`Mapa ${v.name}`}
                                   className="w-full max-h-48 object-contain rounded"
-                                  loading="eager"
-                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                 />
                               </div>
                             )}
