@@ -88,7 +88,7 @@ export default function OpsPage() {
   const [boletosHeaders, setBoletosHeaders] = useState<string[]>([])
 
   // Active tab state
-  const [activeTab, setActiveTab] = useState('checkins')
+  const [activeTab, setActiveTab] = useState('escaneo')
 
   // Search states
   const [reservasSearch, setReservasSearch] = useState('')
@@ -358,30 +358,27 @@ export default function OpsPage() {
       {/* Sub-tabs Navigation */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="flex border-b border-gray-200">
-          {['checkins', 'clientes', 'scanner', 'cupones', 'recovery', 'escalaciones'].map((tab) => (
+          {['escaneo', 'clientes', 'gestion'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold border-b-2 transition-colors capitalize ${
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${
                 activeTab === tab
                   ? 'border-[#EF4444] text-[#EF4444] bg-red-50'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab === 'checkins' ? 'Check-ins' :
+              {tab === 'escaneo' ? `Escaneo (${checkins.length})` :
                tab === 'clientes' ? `Clientes (${customerTotal.toLocaleString()})` :
-               tab === 'scanner' ? `Scanner (${scannerLinks.length})` :
-               tab === 'cupones' ? 'Cupones' :
-               tab === 'recovery' ? `Recovery (${ticketRecovery.length})` :
-               `Escalaciones (${escalations.length})`}
+               `Gestión (${cupones.length + escalations.length})`}
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
         <div className="p-3 sm:p-4">
-          {/* Check-ins Tab */}
-          {activeTab === 'checkins' && (
+          {/* Escaneo Tab = Check-ins + Scanner Links */}
+          {activeTab === 'escaneo' && (
             <div className="space-y-3">
               {/* Scanner — compact inline */}
               <div className="flex flex-col sm:flex-row gap-2 items-stretch">
@@ -491,6 +488,53 @@ export default function OpsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Scanner Links — inline below check-in history */}
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-extrabold text-[#1E293B]">Scanner Links ({scannerLinks.length})</h3>
+                  <button onClick={() => setShowCreateScanner(!showCreateScanner)} className="px-3 py-1 text-white rounded text-xs font-bold hover:opacity-90 bg-[#EF4444]">+ Crear</button>
+                </div>
+                {showCreateScanner && (
+                  <div className="section-card p-2 mb-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <select value={scannerForm.event_id} onChange={e => setScannerForm({...scannerForm, event_id: e.target.value})} className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]">
+                        <option value="">Evento...</option>
+                        {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                      </select>
+                      <input type="text" value={scannerForm.label} onChange={e => setScannerForm({...scannerForm, label: e.target.value})} placeholder="Etiqueta (Puerta 1)" className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]" />
+                      <button onClick={async () => {
+                        if (!scannerForm.event_id || !scannerForm.label) { toast.error('Completa evento y etiqueta'); return }
+                        setScannerSubmitting(true)
+                        const result = await createScannerLink({ event_id: scannerForm.event_id, label: scannerForm.label })
+                        if (result) { setScannerLinks(prev => [result, ...prev]); setScannerForm({ event_id: '', label: '' }); setShowCreateScanner(false); toast.success('Scanner link creado') }
+                        else { toast.error('Error al crear scanner link') }
+                        setScannerSubmitting(false)
+                      }} disabled={scannerSubmitting} className="px-3 py-1.5 bg-[#EF4444] text-white rounded text-xs font-bold disabled:opacity-40">{scannerSubmitting ? '...' : 'Crear'}</button>
+                      <button onClick={() => setShowCreateScanner(false)} className="px-2 py-1.5 text-xs text-gray-500">✕</button>
+                    </div>
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="data-table text-xs">
+                    <thead><tr><th>Label</th><th>Evento</th><th className="text-right">Scans</th><th>Activo</th><th className="hidden sm:table-cell">Válido</th></tr></thead>
+                    <tbody>
+                      {scannerLinks.length > 0 ? scannerLinks.map(sl => {
+                        const ev = events.find(e => e.id === sl.event_id)
+                        return (
+                          <tr key={sl.id}>
+                            <td className="font-bold">{sl.label || (sl.token ? sl.token.substring(0, 8) : '—')}</td>
+                            <td className="truncate max-w-[150px]">{ev?.name || (sl.event_id ? sl.event_id.substring(0, 8) : '—')}</td>
+                            <td className="text-right font-bold">{sl.scans_count || 0}</td>
+                            <td><span className={`badge ${sl.is_active ? 'badge-success' : 'badge-error'}`}>{sl.is_active ? 'Activo' : 'Off'}</span></td>
+                            <td className="hidden sm:table-cell text-gray-500">{sl.valid_from ? new Date(sl.valid_from).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'} — {sl.valid_until ? new Date(sl.valid_until).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '∞'}</td>
+                          </tr>
+                        )
+                      }) : (<tr><td colSpan={5} className="text-center py-4 text-gray-400">No hay scanner links</td></tr>)}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -821,11 +865,34 @@ export default function OpsPage() {
               {customerSearch && searchResults.length === 0 && (
                 <p className="text-center text-gray-500 text-sm py-4">No se encontraron clientes</p>
               )}
+
+              {/* Recovery — inline below CRM */}
+              {ticketRecovery.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <h3 className="text-sm font-extrabold text-[#1E293B] mb-2">Recuperación de Boletos ({ticketRecovery.length})</h3>
+                  <div className="overflow-x-auto">
+                    <table className="data-table text-xs">
+                      <thead><tr><th>Cliente</th><th>Evento</th><th>Canal</th><th>Fecha</th><th>Estado</th></tr></thead>
+                      <tbody>
+                        {ticketRecovery.map(tr => (
+                          <tr key={tr.id}>
+                            <td><span className="font-bold">{tr.customer_name || 'Sin nombre'}</span> <span className="text-gray-400">{tr.customer_email || ''}</span></td>
+                            <td className="font-bold">{tr.event_name || '—'}</td>
+                            <td>{tr.channel || '—'}</td>
+                            <td className="whitespace-nowrap">{new Date(tr.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'})}</td>
+                            <td><span className={`badge ${tr.status === 'completed' ? 'badge-success' : tr.status === 'sent' ? 'badge-info' : 'badge-warning'}`}>{tr.status === 'completed' ? 'OK' : tr.status === 'sent' ? 'Enviado' : 'Pendiente'}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Scanner Links Tab */}
-          {activeTab === 'scanner' && (
+          {/* Scanner Links Tab — HIDDEN (fused into Escaneo) */}
+          {false && activeTab === 'scanner' && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <h2 className="text-sm font-extrabold text-[#1E293B]">Scanner Links</h2>
@@ -874,8 +941,8 @@ export default function OpsPage() {
             </div>
           )}
 
-          {/* Cupones Tab */}
-          {activeTab === 'cupones' && (
+          {/* Gestión Tab = Cupones + Escalaciones */}
+          {activeTab === 'gestion' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-bold text-[#1E293B]">Cupones</h2>
@@ -931,11 +998,36 @@ export default function OpsPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Escalaciones — inline below cupones */}
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <h3 className="text-sm font-extrabold text-[#1E293B] mb-2">Escalaciones ({escalations.length})</h3>
+                {escalations.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="data-table text-xs">
+                      <thead><tr><th>Razón</th><th>Evento</th><th>Descripción</th><th>Fecha</th><th>Estado</th></tr></thead>
+                      <tbody>
+                        {escalations.map(esc => (
+                          <tr key={esc.id}>
+                            <td className="font-bold">{esc.reason || '—'}</td>
+                            <td>{esc.event_mentioned || '—'}</td>
+                            <td className="max-w-[200px] truncate">{esc.description || esc.situation || '—'}</td>
+                            <td className="whitespace-nowrap">{new Date(esc.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'})}</td>
+                            <td><span className={`badge ${esc.resolved ? 'badge-success' : 'badge-error'}`}>{esc.resolved ? 'Resuelto' : 'Pendiente'}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-center py-4 text-gray-400 text-sm">✅ Sin escalaciones pendientes</p>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Recovery Tab */}
-          {activeTab === 'recovery' && (
+          {/* Recovery Tab — HIDDEN (fused into Clientes) */}
+          {false && activeTab === 'recovery' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold text-[#1E293B]">Recuperación de Boletos</h2>
               {ticketRecovery.length > 0 ? (
@@ -986,8 +1078,8 @@ export default function OpsPage() {
             </div>
           )}
 
-          {/* Escalaciones Tab */}
-          {activeTab === 'escalaciones' && (
+          {/* Escalaciones Tab — HIDDEN (fused into Gestión) */}
+          {false && activeTab === 'escalaciones' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold text-[#1E293B]">Escalaciones</h2>
               {escalations.length > 0 ? (
