@@ -5,6 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar,
 } from 'recharts';
+import { exportFinancePdf } from '../lib/exportPdf';
 import FinanceScorecard from '../components/FinanceScorecard';
 // CapacityBars removed — capacity integrated into Ingresos table
 import {
@@ -152,6 +153,7 @@ export default function FinancePage() {
   const [txSearch, setTxSearch] = useState('');
   const [txSort, setTxSort] = useState<{ col: keyof Transaction; asc: boolean }>({ col: 'date', asc: false });
   const [txPage, setTxPage] = useState(0);
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
 
   // Server-side transaction state
   const [serverTxData, setServerTxData] = useState<Order[]>([]);
@@ -630,6 +632,19 @@ export default function FinancePage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPDF = () => {
+    if (!computed) return;
+    exportFinancePdf({
+      revenue: computed.scorecardData.revenue,
+      aov: computed.scorecardData.aov,
+      completedOrders: computed.scorecardData.completedOrders,
+      occupancyPercent: computed.scorecardData.occupancyPercent,
+      eventRevenues: computed.eventRevenues,
+      commissionData: computed.commissionData,
+      zoneRevenues: computed.zoneRevenues,
+    });
+  };
+
   // Transaction filtering, sorting, pagination
   const processedTransactions = useMemo(() => {
     if (!computed) return { items: [] as Transaction[], total: 0 };
@@ -708,16 +723,23 @@ export default function FinancePage() {
             <h1 className="text-lg sm:text-xl font-extrabold text-gray-900">Panel Financiero</h1>
             <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">Metricas de ingresos, capacidad y tendencias</p>
           </div>
-          <button
-            onClick={exportCSV}
-            className="px-3 py-2 bg-[#EF4444] text-white rounded-lg text-xs font-medium hover:bg-[#c5303c] transition-colors flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span className="hidden sm:inline">Exportar CSV</span>
-            <span className="sm:hidden">CSV</span>
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              onClick={exportPDF}
+              className="px-3 py-2 bg-[#EF4444] text-white rounded-lg text-xs font-bold hover:bg-[#c5303c] transition-colors flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              PDF
+            </button>
+            <button
+              onClick={exportCSV}
+              className="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors"
+            >
+              CSV
+            </button>
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           {/* Date range presets */}
@@ -1003,18 +1025,12 @@ export default function FinancePage() {
               <div className="section-card-body">
                 <div style={{ width: '100%', height: 200 }}>
                   <ResponsiveContainer width="99%" height={200}>
-                    <AreaChart data={dailyRevenueData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
+                    <BarChart data={dailyRevenueData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
                       <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ingresos']} />
-                      <Area type="monotone" dataKey="amount" stroke="#EF4444" fill="url(#revenueGrad)" strokeWidth={2} dot={false} />
-                    </AreaChart>
+                      <Bar dataKey="amount" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -1029,57 +1045,7 @@ export default function FinancePage() {
       {/* ====== TENDENCIAS TAB ====== */}
       {activeTab === 'tendencias' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Ventas por día + UTM side by side — compact */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="section-card">
-              <div className="section-card-header">
-                <span className="section-card-title">Ventas por Día</span>
-              </div>
-              <div className="section-card-body">
-                <div style={{ width: '100%', height: 180 }}>
-                <ResponsiveContainer width="99%" height={180}>
-                  <BarChart data={dayOfWeekData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                    <XAxis dataKey="day" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
-                    <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ventas']} />
-                    <Bar dataKey="sales" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* UTM + Dispositivos as compact table */}
-            <div className="section-card">
-              <div className="section-card-header">
-                <span className="section-card-title">Fuentes de Tráfico</span>
-              </div>
-              <div className="section-card-body p-0">
-                <table className="data-table text-xs">
-                  <thead>
-                    <tr>
-                      <th>Fuente</th>
-                      <th className="text-right">Revenue</th>
-                      <th className="text-right">Órdenes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {utmSources.length > 0 ? utmSources.map((s, i) => (
-                      <tr key={i}>
-                        <td className="font-bold">{s.source}</td>
-                        <td className="text-right">{fmtCurrency(s.revenue)}</td>
-                        <td className="text-right">{s.count}</td>
-                      </tr>
-                    )) : (
-                      <tr><td colSpan={3} className="text-center py-4 text-gray-400">Sin datos de UTM</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick stats row */}
+          {/* Quick stats row — top */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
               <p className="text-[10px] text-gray-500 uppercase">Mejor día</p>
@@ -1096,6 +1062,62 @@ export default function FinancePage() {
             <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
               <p className="text-[10px] text-gray-500 uppercase">Top zona</p>
               <p className="text-xs sm:text-sm font-extrabold">{summaryStats.popularZone}</p>
+            </div>
+          </div>
+
+          {/* UTM Fuentes de Tráfico — full width */}
+          <div className="section-card">
+            <div className="section-card-header">
+              <span className="section-card-title">Fuentes de Tráfico</span>
+              <span className="ml-auto text-xs text-gray-400">{utmSources.length} fuentes</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="data-table text-xs">
+                <thead>
+                  <tr>
+                    <th>Fuente</th>
+                    <th className="text-right">Revenue</th>
+                    <th className="text-right">Órdenes</th>
+                    <th className="text-right hidden sm:table-cell">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {utmSources.length > 0 ? (() => {
+                    const totalUtmRev = utmSources.reduce((s, u) => s + u.revenue, 0);
+                    return utmSources.map((s, i) => (
+                      <tr key={i}>
+                        <td className="font-bold">{s.source}</td>
+                        <td className="text-right font-bold">{fmtCurrency(s.revenue)}</td>
+                        <td className="text-right">{s.count}</td>
+                        <td className="text-right hidden sm:table-cell">
+                          <span className="text-gray-500">{totalUtmRev > 0 ? Math.round((s.revenue / totalUtmRev) * 100) : 0}%</span>
+                        </td>
+                      </tr>
+                    ));
+                  })() : (
+                    <tr><td colSpan={4} className="text-center py-4 text-gray-400">Sin datos de UTM</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Ventas por Día de la Semana — chart below traffic */}
+          <div className="section-card">
+            <div className="section-card-header">
+              <span className="section-card-title">Ventas por Día de la Semana</span>
+            </div>
+            <div className="section-card-body">
+              <div style={{ width: '100%', height: 200 }}>
+              <ResponsiveContainer width="99%" height={200}>
+                <BarChart data={dayOfWeekData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
+                  <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ventas']} />
+                  <Bar dataKey="sales" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </div>
@@ -1121,7 +1143,7 @@ export default function FinancePage() {
             <span className="text-xs text-gray-500 whitespace-nowrap">{processedTransactions.total} registros</span>
           </div>
 
-          {/* Table */}
+          {/* Table with drill-down */}
           <div className="overflow-x-auto">
             <table className="data-table text-xs">
               <thead>
@@ -1133,25 +1155,36 @@ export default function FinancePage() {
                     <span className="inline-flex items-center gap-1">Fecha{txSort.col === 'date' && <span className={txSort.asc ? '' : 'rotate-180 inline-block'}>▲</span>}</span>
                   </th>
                   <th className="cursor-pointer" onClick={() => toggleSort('customer_name')}>Cliente</th>
-                  <th className="cursor-pointer hidden md:table-cell" onClick={() => toggleSort('event_name')}>Evento</th>
-                  <th className="cursor-pointer hidden lg:table-cell" onClick={() => toggleSort('zone_name')}>Zona</th>
+                  <th className="cursor-pointer" onClick={() => toggleSort('event_name')}>Evento</th>
                   <th className="text-right cursor-pointer" onClick={() => toggleSort('amount')}>Monto</th>
                   <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
-                {processedTransactions.items.length > 0 ? processedTransactions.items.map((tx, i) => (
-                  <tr key={`${tx.id}-${i}`}>
-                    <td className="font-mono text-[#EF4444] font-bold">{/^[0-9a-fA-F]{8}-/.test(tx.id) ? tx.id.substring(0, 8) + '…' : tx.id}</td>
+                {processedTransactions.items.length > 0 ? processedTransactions.items.map((tx, i) => {
+                  const txKey = `${tx.id}-${i}`;
+                  const isExpTx = expandedTxId === txKey;
+                  const txDate = new Date(tx.date);
+                  const dayName = txDate.toLocaleDateString('es-MX', { weekday: 'long' });
+                  const fullDate = txDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+                  const fullTime = txDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+                  return (
+                  <React.Fragment key={txKey}>
+                  <tr onClick={() => setExpandedTxId(isExpTx ? null : txKey)} className={`cursor-pointer ${isExpTx ? 'bg-red-50' : ''}`}>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <svg className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isExpTx ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        <span className="font-mono text-[#EF4444] font-bold">{/^[0-9a-fA-F]{8}-/.test(tx.id) ? tx.id.substring(0, 8) + '…' : tx.id}</span>
+                      </div>
+                    </td>
                     <td className="text-gray-500 whitespace-nowrap">
-                      {new Date(tx.date).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {txDate.toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td>
                       <div className="font-bold truncate max-w-[120px]">{tx.customer_name || 'Sin nombre'}</div>
                       <div className="text-gray-400 text-[10px] truncate max-w-[120px]">{tx.customer_email || ''}</div>
                     </td>
-                    <td className="hidden md:table-cell">{tx.event_name}</td>
-                    <td className="hidden lg:table-cell">{tx.zone_name}</td>
+                    <td>{tx.event_name}</td>
                     <td className="text-right font-bold">{fmtCurrency(tx.amount)}</td>
                     <td>
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
@@ -1163,8 +1196,62 @@ export default function FinancePage() {
                       </span>
                     </td>
                   </tr>
-                )) : (
-                  <tr><td colSpan={7} className="text-center py-6 text-gray-400">No hay transacciones</td></tr>
+                  {/* Drill-down detail */}
+                  {isExpTx && (
+                    <tr>
+                      <td colSpan={6} className="bg-gray-50 p-0">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Evento</p>
+                            <p className="text-sm font-bold text-gray-900">{tx.event_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Día</p>
+                            <p className="text-sm font-bold text-gray-900 capitalize">{dayName}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Fecha</p>
+                            <p className="text-sm font-bold text-gray-900">{fullDate}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Hora</p>
+                            <p className="text-sm font-bold text-gray-900">{fullTime}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Zona</p>
+                            <p className="text-sm font-bold text-gray-900">{tx.zone_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Pago</p>
+                            <p className="text-sm font-extrabold text-[#EF4444]">{fmtCurrency(tx.amount)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Cliente</p>
+                            <p className="text-sm font-bold text-gray-900">{tx.customer_name || 'Sin nombre'}</p>
+                            <p className="text-[11px] text-gray-500">{tx.customer_email || ''}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">ID Transacción</p>
+                            <p className="text-xs font-mono text-gray-700 break-all">{tx.id}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Estado</p>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                              tx.status === 'Completado' ? 'bg-green-500' :
+                              tx.status === 'Reembolsado' ? 'bg-red-500' :
+                              tx.status === 'Usado' ? 'bg-blue-500' : 'bg-yellow-500'
+                            }`}>
+                              {tx.status}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  );
+                }) : (
+                  <tr><td colSpan={6} className="text-center py-6 text-gray-400">No hay transacciones</td></tr>
                 )}
               </tbody>
             </table>
@@ -1206,7 +1293,24 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Commission Breakdown Table — .data-table */}
+          {/* Visual split bar */}
+          <div className="section-card">
+            <div className="section-card-header">
+              <span className="section-card-title">Distribución</span>
+            </div>
+            <div className="px-4 pb-4">
+              <div className="h-6 rounded-full overflow-hidden flex">
+                <div className="bg-[#EF4444] flex items-center justify-center" style={{ width: '15%' }}>
+                  <span className="text-[9px] font-bold text-white">15%</span>
+                </div>
+                <div className="bg-emerald-500 flex items-center justify-center" style={{ width: '85%' }}>
+                  <span className="text-[9px] font-bold text-white">85% Productor</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Commission Breakdown Table with drill-down */}
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
@@ -1219,10 +1323,18 @@ export default function FinancePage() {
                 </tr>
               </thead>
               <tbody>
-                {commissionData.events.length > 0 ? commissionData.events.map(event => (
-                  <tr key={event.event_id}>
+                {commissionData.events.length > 0 ? commissionData.events.map(event => {
+                  const isExpComm = expandedRevenueEvent === `comm-${event.event_id}`;
+                  const eventZones = rawZones.filter(z => z.event_id === event.event_id);
+                  return (
+                  <React.Fragment key={event.event_id}>
+                  <tr
+                    onClick={() => setExpandedRevenueEvent(isExpComm ? null : `comm-${event.event_id}`)}
+                    className={`cursor-pointer ${isExpComm ? 'bg-red-50' : ''}`}
+                  >
                     <td>
                       <div className="flex items-center gap-2">
+                        <svg className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isExpComm ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         {event.image_url && (
                           <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
                         )}
@@ -1234,7 +1346,47 @@ export default function FinancePage() {
                     <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.commission)}</td>
                     <td className="text-right font-bold text-emerald-600">{fmtCurrency(event.producer)}</td>
                   </tr>
-                )) : (
+                  {isExpComm && (
+                    <tr>
+                      <td colSpan={5} className="bg-gray-50 p-4">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Desglose por Zona</p>
+                        {eventZones.length > 0 ? (
+                          <table className="w-full text-xs">
+                            <thead className="bg-[#1a1a2e] text-white">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Zona</th>
+                                <th className="px-3 py-2 text-right text-xs font-bold">Precio</th>
+                                <th className="px-3 py-2 text-right text-xs font-bold">Vendidos</th>
+                                <th className="px-3 py-2 text-right text-xs font-bold">Revenue</th>
+                                <th className="px-3 py-2 text-right text-xs font-bold">Comisión</th>
+                                <th className="px-3 py-2 text-right text-xs font-bold">Productor</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {eventZones.map((z, zi) => {
+                                const zRev = z.sold * z.price;
+                                return (
+                                  <tr key={zi} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="px-3 py-2 font-bold">{z.zone_name}</td>
+                                    <td className="px-3 py-2 text-right">{fmtCurrency(z.price)}</td>
+                                    <td className="px-3 py-2 text-right">{z.sold}</td>
+                                    <td className="px-3 py-2 text-right font-bold">{fmtCurrency(zRev)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-[#EF4444]">{fmtCurrency(zRev * 0.15)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-emerald-600">{fmtCurrency(zRev * 0.85)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <p className="text-xs text-gray-400">Sin datos de zonas</p>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  );
+                }) : (
                   <tr><td colSpan={5} className="text-center py-6 text-gray-400">No hay datos de comisiones</td></tr>
                 )}
                 {commissionData.events.length > 1 && (
