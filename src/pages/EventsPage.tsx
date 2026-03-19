@@ -12,6 +12,7 @@ import {
   fetchScheduleInventory,
   fetchVenueSeats,
   fetchEventSectionSeatsForEvent,
+  fetchEventSections,
   fetchVenues,
   getVenueMap,
   getVenueName,
@@ -22,6 +23,7 @@ import {
   Schedule,
   ScheduleInventory,
   VenueSeat,
+  EventSection,
   EventSectionSeat,
   Venue,
   EventDashboard,
@@ -448,11 +450,15 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
   const [venueSeats, setVenueSeats] = useState<VenueSeat[]>([]);
   const [sectionSeats, setSectionSeats] = useState<(EventSectionSeat & { section_name?: string })[]>([]);
+  const [eventSections, setEventSections] = useState<EventSection[]>([]);
   // Auto-show seat map for reserved events (zone_type, not event_type)
   const hasReservedZones = project.events.flatMap(e => e.zones).some(z => z.tipo === 'reserved' || z.tipo === 'numbered');
   const [showSeatMap, setShowSeatMap] = useState(hasReservedZones);
 
-  const isReserved = project.event_type === 'reserved' || project.event_type === 'hybrid';
+  // Check zone types (Dimension 2) — NOT event_type which is Dimension 1
+  const hasReservedOrHybridZones = project.events.flatMap(e => e.zones).some(
+    z => z.tipo === 'reserved' || z.tipo === 'numbered' || z.tipo === 'hybrid'
+  );
 
   // Fetch schedule inventory + seat data on mount
   useEffect(() => {
@@ -462,14 +468,13 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
       .then(results => setSchedInv(results.flat()))
       .catch(() => {});
 
-    // Seat map data for reserved/hybrid events
-    if (isReserved) {
-      const venueId = project.events[0]?.venueId;
-      if (venueId) {
-        fetchVenueSeats(venueId).then(setVenueSeats).catch(() => {});
-      }
-      fetchEventSectionSeatsForEvent(eventId).then(setSectionSeats).catch(() => {});
+    // Always try to fetch seat data — venue may have seats even if zones say 'ga' (Libanés bug)
+    const venueId = project.events[0]?.venueId;
+    if (venueId) {
+      fetchVenueSeats(venueId).then(setVenueSeats).catch(() => {});
     }
+    fetchEventSectionSeatsForEvent(eventId).then(setSectionSeats).catch(() => {});
+    fetchEventSections(eventId).then(setEventSections).catch(() => {});
   }, [eventId]);
 
   const totalRevenue = project.events.reduce((s, e) => s + e.revenue, 0);
@@ -689,7 +694,38 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
               </div>
             )}
             {/* Seat Map for reserved/hybrid events */}
-            {isReserved && venueSeats.length > 0 && (
+            {/* Event Sections (Paolo's colored sections with price/capacity) */}
+            {eventSections.filter(s => s.section !== 'default').length > 0 && (
+              <div className="section-card">
+                <div className="section-card-header">
+                  <h4 className="section-card-title">Secciones del Evento ({eventSections.filter(s => s.section !== 'default').length})</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table text-xs">
+                    <thead><tr><th>Sección</th><th className="text-right">Precio</th><th className="text-right">Capacidad</th><th className="text-center">Color</th></tr></thead>
+                    <tbody>
+                      {eventSections.filter(s => s.section !== 'default').map(s => (
+                        <tr key={s.id}>
+                          <td className="font-bold">
+                            {s.color && <span className="inline-block w-3 h-3 rounded-full mr-1.5 align-middle" style={{ backgroundColor: s.color }}></span>}
+                            {s.section}
+                          </td>
+                          <td className="text-right">{formatCurrency(s.price || 0)}</td>
+                          <td className="text-right">{s.capacity?.toLocaleString() || '—'}</td>
+                          <td className="text-center">
+                            {s.color ? (
+                              <span className="text-[10px] font-mono text-gray-400">{s.color}</span>
+                            ) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {/* Seat Map for venues with actual seats loaded */}
+            {venueSeats.length > 0 && (
               <div className="section-card">
                 <div
                   className="section-card-header cursor-pointer"
@@ -1287,6 +1323,13 @@ export default function EventsPage() {
                               </div>
                               <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline">📍 Ver en Maps</a>
                             </div>
+                            {/* SVG Layout Map */}
+                            {v.layout_svg_url && (
+                              <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 overflow-hidden">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Mapa del Recinto</p>
+                                <img src={v.layout_svg_url} alt={`Mapa ${v.name}`} className="w-full max-h-48 object-contain rounded" />
+                              </div>
+                            )}
                             {/* Events in this venue */}
                             <p className="text-[10px] font-bold text-gray-500 uppercase mt-2">Eventos ({venueEvents.length})</p>
                             {venueEvents.length > 0 ? (

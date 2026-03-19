@@ -342,9 +342,14 @@ export interface VenueSeat {
 export interface EventSection {
   id: string;
   event_id: string;
+  schedule_id?: string;
+  section: string;
   name: string;
+  price: number;
   capacity: number;
+  color?: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface EventSectionSeat {
