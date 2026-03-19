@@ -2,33 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CLK/Cellosa Dashboard Design System */
+/* CLK/Cellosa Dashboard Design System — Compact Edition */
 
-/* Metric Cards - Cellosa style */
+/* Metric Cards - Cellosa style, tight */
 .metric-card {
-  @apply bg-white rounded-lg border border-gray-200 p-3 relative;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  @apply bg-white rounded-lg border border-gray-200 p-2.5 relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .metric-card-title {
-  @apply text-sm text-gray-500 font-medium;
+  @apply text-xs text-gray-500 font-medium;
 }
 
 .metric-card-value {
-  @apply text-2xl font-bold text-gray-900 mt-1;
+  @apply text-xl font-bold text-gray-900 mt-0.5;
 }
 
 .metric-card-subtitle {
-  @apply text-xs text-gray-400 mt-0.5;
+  @apply text-[11px] text-gray-400 mt-0;
 }
 
 .metric-card-icon {
-  @apply absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center;
+  @apply absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center;
 }
 
-/* Data Table - CLK/Cellosa style with dark header */
+/* Data Table - CLK/Cellosa style, dense rows */
 .data-table {
   @apply w-full text-sm;
+  table-layout: auto;
 }
 
 .data-table thead {
@@ -36,7 +37,7 @@
 }
 
 .data-table thead th {
-  @apply px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider;
+  @apply px-3 py-2 text-left font-semibold text-xs uppercase tracking-wider;
 }
 
 .data-table tbody tr {
@@ -44,7 +45,7 @@
 }
 
 .data-table tbody td {
-  @apply px-4 py-3 text-gray-700;
+  @apply px-3 py-2 text-gray-700;
 }
 
 .data-table tbody tr:last-child {
@@ -60,14 +61,14 @@
   @apply text-white;
 }
 
-/* Section Cards */
+/* Section Cards - tight spacing */
 .section-card {
   @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .section-card-header {
-  @apply px-5 py-4 border-b border-gray-100 flex items-center gap-2;
+  @apply px-3 py-2.5 border-b border-gray-100 flex items-center gap-2;
 }
 
 .section-card-title {
@@ -75,12 +76,22 @@
 }
 
 .section-card-body {
-  @apply p-5;
+  @apply p-3;
+}
+
+/* Tables inside section-card: flush edges */
+.section-card-body .data-table {
+  @apply -mx-3 -mb-3;
+  width: calc(100% + 1.5rem);
+}
+
+.section-card-body .data-table:first-child {
+  @apply -mt-3;
 }
 
 /* Status Badges - Cellosa style */
 .badge {
-  @apply inline-flex items-center px-2.5 py-1 rounded text-xs font-medium;
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
 }
 
 .badge-success {
@@ -99,6 +110,32 @@
   @apply bg-blue-50 text-blue-600;
 }
 
+/* Event type badges */
+.badge-single {
+  @apply bg-amber-100 text-amber-800;
+}
+
+.badge-recurring {
+  @apply bg-indigo-100 text-indigo-800;
+}
+
+.badge-multiday {
+  @apply bg-teal-100 text-teal-800;
+}
+
+/* Zone type badges */
+.badge-ga {
+  @apply bg-green-100 text-green-800;
+}
+
+.badge-reserved {
+  @apply bg-orange-100 text-orange-800;
+}
+
+.badge-hybrid {
+  @apply bg-purple-100 text-purple-800;
+}
+
 /* Percentage highlights - CLK style */
 .pct-negative {
   @apply text-red-500 font-medium;
@@ -106,6 +143,19 @@
 
 .pct-positive {
   @apply text-emerald-500 font-medium;
+}
+
+/* Occupancy badges */
+.occupancy-high {
+  @apply text-emerald-600 font-semibold;
+}
+
+.occupancy-mid {
+  @apply text-amber-600 font-semibold;
+}
+
+.occupancy-low {
+  @apply text-red-500 font-semibold;
 }
 
 /* Hide scrollbar but allow scroll */
@@ -123,13 +173,13 @@
   @apply overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0;
 }
 
-/* Mobile-compact data-table cells */
+/* Mobile-compact */
 @media (max-width: 639px) {
   .data-table thead th {
-    @apply px-2 py-2 text-[10px];
+    @apply px-2 py-1.5 text-[10px];
   }
   .data-table tbody td {
-    @apply px-2 py-2 text-xs;
+    @apply px-2 py-1.5 text-xs;
   }
   .metric-card {
     @apply p-2;
@@ -138,15 +188,22 @@
     @apply text-lg;
   }
   .section-card-header {
-    @apply px-3 py-3;
+    @apply px-2.5 py-2;
   }
   .section-card-body {
-    @apply p-3;
+    @apply p-2;
+  }
+  .section-card-body .data-table {
+    @apply -mx-2 -mb-2;
+    width: calc(100% + 1rem);
+  }
+  .section-card-body .data-table:first-child {
+    @apply -mt-2;
   }
 }
 
-/* Smooth transitions */
-* {
+/* Smooth transitions — exclude all to avoid lag */
+button, a, .badge, .data-table tbody tr {
   @apply transition-colors duration-150;
 }
 
@@ -157,7 +214,7 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.25s ease-out;
+  animation: fadeIn 0.2s ease-out;
 }
 
 /* Smooth expand/collapse */
