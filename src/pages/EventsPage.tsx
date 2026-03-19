@@ -613,8 +613,10 @@ function ActionsMenu({
 
 /* ─── Inline Detail Panel ─── */
 
-function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay; dashboardData: EventDashboard[] }) {
+function EventDetailPanel({ project, dashboardData, venueMap }: { project: ProjectDisplay; dashboardData: EventDashboard[]; venueMap: Map<string, Venue> }) {
   const eventId = project.events[0]?.id;
+  const venueId = project.events[0]?.venueId;
+  const venueData = venueId ? venueMap.get(venueId) : undefined;
   const eventDashZones = dashboardData.filter(d => d.event_id === eventId);
   const [schedInv, setSchedInv] = useState<ScheduleInventory[]>([]);
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
@@ -900,6 +902,22 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+            {/* Venue SVG Layout Map — shows for any event whose venue has a map */}
+            {venueData?.layout_svg_url && (
+              <div className="section-card">
+                <div className="section-card-header">
+                  <span className="section-card-title">🏟️ Mapa del Recinto</span>
+                  <span className="ml-auto text-xs text-gray-400">{venueData.name}</span>
+                </div>
+                <div className="section-card-body flex justify-center">
+                  <CachedSvgImage
+                    src={venueData.layout_svg_url}
+                    alt={`Mapa ${venueData.name}`}
+                    className="max-w-full max-h-64 object-contain rounded"
+                  />
                 </div>
               </div>
             )}
@@ -1382,7 +1400,7 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                {isExpanded && <EventDetailPanel project={project} dashboardData={eventDashboardData} />}
+                {isExpanded && <EventDetailPanel project={project} dashboardData={eventDashboardData} venueMap={venueMap} />}
               </div>
             );
           })}
