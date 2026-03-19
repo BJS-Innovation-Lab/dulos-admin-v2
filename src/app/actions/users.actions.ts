@@ -70,33 +70,70 @@ export async function inviteUser(formData: UserInviteFormData) {
     const data = await res.json();
 
     // Step 2: Send invite via Supabase Auth Admin
-    // Creates auth user + sends invitation email with magic link
+    // Creates auth user + sends invitation email
     let emailSent = false;
-    try {
-      const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: parsed.data.email,
-          data: {
-            role: parsed.data.role,
-            display_name: name,
-          },
-        }),
-      });
-      emailSent = inviteRes.ok;
-      if (!emailSent) {
-        console.warn('Auth invite email failed:', await inviteRes.text());
+    let emailMethod = 'none';
+
+    // Try Resend first (if configured) for beautiful custom email
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (RESEND_API_KEY) {
+      try {
+        const { Resend } = await import('resend');
+        const { inviteEmailHTML } = await import('@/lib/email-templates');
+        const resend = new Resend(RESEND_API_KEY);
+        const html = inviteEmailHTML({
+          name,
+          role: parsed.data.role,
+          loginUrl: 'https://dulos-admin-v2.vercel.app/login',
+        });
+
+        const { error: resendError } = await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || 'Dulos <noreply@dulos.io>',
+          to: parsed.data.email,
+          subject: `🎫 Bienvenido a Dulos — Acceso como ${
+            parsed.data.role === 'super_admin' ? 'Administrador' :
+            parsed.data.role === 'operator' ? 'Operador' :
+            parsed.data.role === 'analyst' ? 'Analista' : 'Taquillero'
+          }`,
+          html,
+        });
+
+        if (!resendError) {
+          emailSent = true;
+          emailMethod = 'resend';
+        }
+      } catch (e) {
+        console.warn('Resend error:', e);
       }
-    } catch (e) {
-      console.warn('Auth invite error:', e);
     }
 
-    logAction('invite', 'user', data[0]?.id || '', JSON.stringify({ email: parsed.data.email, role: parsed.data.role, emailSent }));
+    // Fallback: Supabase Auth invite
+    if (!emailSent) {
+      try {
+        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: parsed.data.email,
+            data: { role: parsed.data.role, display_name: name },
+          }),
+        });
+        if (inviteRes.ok) {
+          emailSent = true;
+          emailMethod = 'supabase';
+        } else {
+          console.warn('Auth invite email failed:', await inviteRes.text());
+        }
+      } catch (e) {
+        console.warn('Auth invite error:', e);
+      }
+    }
+
+    logAction('invite', 'user', data[0]?.id || '', JSON.stringify({ email: parsed.data.email, role: parsed.data.role, emailSent, emailMethod }));
 
     return {
       success: true,
