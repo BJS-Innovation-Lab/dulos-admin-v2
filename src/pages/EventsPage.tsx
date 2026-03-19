@@ -951,6 +951,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<DulosEvent[]>([]);
   const [venueMap, setVenueMap] = useState<Map<string, Venue>>(new Map());
   const [allVenues, setAllVenues] = useState<Venue[]>([]);
+  const [venueSeatCounts, setVenueSeatCounts] = useState<Map<string, number>>(new Map());
   const [venueFilter, setVenueFilter] = useState({ city: '', type: '' });
   const [expandedVenueId, setExpandedVenueId] = useState<string | null>(null);
   const [eventDashboardData, setEventDashboardData] = useState<EventDashboard[]>([]);
@@ -987,6 +988,16 @@ export default function EventsPage() {
       setAllVenues(venuesList);
       setEvents(events);
       setEventDashboardData(dashboardData);
+
+      // Fetch venue_seats counts for Recintos display
+      if (venuesList.length > 0) {
+        Promise.all(venuesList.map(v => fetchVenueSeats(v.id).then(seats => ({ id: v.id, count: seats.length })).catch(() => ({ id: v.id, count: 0 }))))
+          .then(results => {
+            const map = new Map<string, number>();
+            results.forEach(r => { if (r.count > 0) map.set(r.id, r.count); });
+            setVenueSeatCounts(map);
+          });
+      }
 
       // Build projects directly from events
       if (events.length > 0) {
@@ -1425,7 +1436,10 @@ export default function EventsPage() {
                         </div>
                       </td>
                       <td className="text-center">{geo || '—'}</td>
-                      <td className="text-center font-bold">{v.capacity?.toLocaleString() || '—'}</td>
+                      <td className="text-center font-bold">
+                        {v.capacity?.toLocaleString() || '—'}
+                        {venueSeatCounts.get(v.id) ? <span className="block text-[9px] text-gray-400 font-normal">{venueSeatCounts.get(v.id)} seats</span> : null}
+                      </td>
                       <td className="hidden sm:table-cell text-center text-gray-500 text-[10px]">{v.timezone === 'America/Mexico_City' ? 'CDMX' : v.timezone?.replace('America/', '') || '—'}</td>
                       <td className="hidden sm:table-cell text-center">
                         <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-blue-500 hover:underline text-[10px]">📍 Maps</a>
@@ -1440,7 +1454,7 @@ export default function EventsPage() {
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <div>
                                 <p className="text-xs font-bold text-gray-700">{v.name}</p>
-                                <p className="text-[10px] text-gray-500">{geo} · Cap. {v.capacity?.toLocaleString() || '?'}</p>
+                                <p className="text-[10px] text-gray-500">{geo} · Cap. {v.capacity?.toLocaleString() || '?'}{venueSeatCounts.get(v.id) ? ` · ${venueSeatCounts.get(v.id)} asientos mapeados` : ''}</p>
                               <div className="flex items-center gap-1.5 mt-1">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Asientos:</span>
                                 {(() => {
@@ -1456,7 +1470,13 @@ export default function EventsPage() {
                             {v.layout_svg_url && (
                               <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 overflow-hidden">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Mapa del Recinto</p>
-                                <img src={v.layout_svg_url} alt={`Mapa ${v.name}`} className="w-full max-h-48 object-contain rounded" />
+                                <img
+                                  src={v.layout_svg_url}
+                                  alt={`Mapa ${v.name}`}
+                                  className="w-full max-h-48 object-contain rounded"
+                                  loading="eager"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
                               </div>
                             )}
                             {/* Events in this venue */}

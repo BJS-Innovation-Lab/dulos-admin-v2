@@ -40,6 +40,15 @@
   @apply px-3 py-2 text-left font-semibold text-xs uppercase tracking-wider;
 }
 
+/* Numeric columns: header and value both right-aligned */
+.data-table thead th.text-right {
+  text-align: right;
+}
+
+.data-table thead th.text-center {
+  text-align: center;
+}
+
 .data-table tbody tr {
   @apply border-b border-gray-100 hover:bg-gray-50 transition-colors;
 }
