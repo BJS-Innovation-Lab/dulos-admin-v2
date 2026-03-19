@@ -949,22 +949,22 @@ export default function FinancePage() {
                               {event.venues && event.venues.length >= 1 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Por Recinto</p>
-                                  <div className="overflow-x-auto"><table className="w-full text-xs">
-                                    <thead className="bg-[#1a1a2e] text-white">
+                                  <div className="overflow-x-auto"><table className="data-table text-xs">
+                                    <thead>
                                       <tr>
-                                        <th className="px-3 py-2 text-left text-xs font-bold">Recinto</th>
-                                        <th className="px-3 py-2 text-right text-xs font-bold">Boletos</th>
-                                        <th className="px-3 py-2 text-right text-xs font-bold">Órdenes</th>
-                                        <th className="px-3 py-2 text-right text-xs font-bold">Revenue</th>
+                                        <th>Recinto</th>
+                                        <th className="text-right">Boletos</th>
+                                        <th className="text-right">Órdenes</th>
+                                        <th className="text-right">Revenue</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {event.venues.map((v, vi) => (
-                                        <tr key={vi} className="border-b border-gray-100 hover:bg-gray-50">
-                                          <td className="px-3 py-2 font-bold">{v.venue_name || 'Sin recinto'}</td>
-                                          <td className="px-3 py-2 text-right">{v.tickets}</td>
-                                          <td className="px-3 py-2 text-right">{v.orders}</td>
-                                          <td className="px-3 py-2 text-right font-bold">{fmtCurrency(v.revenue)}</td>
+                                        <tr key={vi}>
+                                          <td className="font-bold">{v.venue_name || 'Sin recinto'}</td>
+                                          <td className="text-right">{v.tickets}</td>
+                                          <td className="text-right">{v.orders}</td>
+                                          <td className="text-right font-bold">{fmtCurrency(v.revenue)}</td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -975,15 +975,15 @@ export default function FinancePage() {
                               {expandedEventZones.length > 0 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Desglose por Zona</p>
-                                  <div className="overflow-x-auto"><table className="w-full text-xs">
-                                    <thead className="bg-[#1a1a2e] text-white">
+                                  <div className="overflow-x-auto"><table className="data-table text-xs">
+                                    <thead>
                                       <tr>
-                                        <th className="px-3 py-2 text-left font-bold text-xs">Zona</th>
-                                        <th className="px-3 py-2 text-right font-bold text-xs">Precio</th>
-                                        <th className="px-3 py-2 text-right font-bold text-xs">Vendidos</th>
-                                        <th className="px-3 py-2 text-right font-bold text-xs">Disponibles</th>
-                                        <th className="px-3 py-2 text-right font-bold text-xs">Revenue</th>
-                                        <th className="px-3 py-2 text-right font-bold text-xs">%</th>
+                                        <th>Zona</th>
+                                        <th className="text-right">Precio</th>
+                                        <th className="text-right">Vendidos</th>
+                                        <th className="text-right">Disponibles</th>
+                                        <th className="text-right">Revenue</th>
+                                        <th className="text-right">%</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -991,13 +991,13 @@ export default function FinancePage() {
                                         const cap = z.sold + z.available;
                                         const occPct = cap > 0 ? Math.round((z.sold / cap) * 100) : 0;
                                         return (
-                                          <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                                            <td className="px-3 py-2 font-bold">{z.zone_name}</td>
-                                            <td className="px-3 py-2 text-right">{fmtCurrency(z.price)}</td>
-                                            <td className="px-3 py-2 text-right">{z.sold}</td>
-                                            <td className="px-3 py-2 text-right">{z.available}</td>
-                                            <td className="px-3 py-2 text-right font-bold text-[#EF4444]">{fmtCurrency(z.sold * z.price)}</td>
-                                            <td className="px-3 py-2 text-right">
+                                          <tr key={i}>
+                                            <td className="font-bold">{z.zone_name}</td>
+                                            <td className="text-right">{fmtCurrency(z.price)}</td>
+                                            <td className="text-right">{z.sold}</td>
+                                            <td className="text-right">{z.available}</td>
+                                            <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(z.sold * z.price)}</td>
+                                            <td className="text-right">
                                               <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${occPct >= 80 ? 'bg-red-500' : occPct >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>
                                                 {occPct}%
                                               </span>
@@ -1013,18 +1013,18 @@ export default function FinancePage() {
                               {expandedEventSections.length > 0 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Secciones de Asientos (Paolo)</p>
-                                  <div className="overflow-x-auto"><table className="w-full text-xs">
-                                    <thead className="bg-[#1a1a2e] text-white">
+                                  <div className="overflow-x-auto"><table className="data-table text-xs">
+                                    <thead>
                                       <tr>
-                                        <th className="px-3 py-2 text-left font-bold text-xs">Sección</th>
-                                        <th className="px-3 py-2 text-right font-bold text-xs">Capacidad</th>
+                                        <th>Sección</th>
+                                        <th className="text-right">Capacidad</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {expandedEventSections.map((s, i) => (
-                                        <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                                          <td className="px-3 py-2 font-bold">{s.name}</td>
-                                          <td className="px-3 py-2 text-right">{s.capacity}</td>
+                                        <tr key={i}>
+                                          <td className="font-bold">{s.name}</td>
+                                          <td className="text-right">{s.capacity}</td>
                                         </tr>
                                       ))}
                                     </tbody>

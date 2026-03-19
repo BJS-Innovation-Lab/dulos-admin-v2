@@ -483,8 +483,8 @@ function ProjectModal({
                   <div>
                     <label className="text-[10px] text-gray-500 mb-0.5 block">Tipo de asiento</label>
                     <select value={z.type} onChange={e => updateZone(i, 'type', e.target.value)} className={inputCls}>
-                      <option value="ga">Parado (GA)</option>
-                      <option value="reserved">Sentado (Numerado)</option>
+                      <option value="ga">General (GA)</option>
+                      <option value="reserved">Numerado</option>
                     </select>
                   </div>
                 </div>
@@ -1433,9 +1433,9 @@ export default function EventsPage() {
           if (hasGA) return 'parado';
           return v.has_seatmap ? 'sentado' : 'parado';
         };
-        const seatLabel = (t: string) => t === 'sentado' ? 'Sentado' : t === 'mixto' ? 'Mixto' : 'Parado';
+        const seatLabel = (t: string) => t === 'sentado' ? 'Numerado' : t === 'mixto' ? 'Mixto' : 'General';
         const seatBadge = (t: string) => t === 'sentado' ? 'badge-reserved' : t === 'mixto' ? 'badge-hybrid' : 'badge-ga';
-        const seatDesc = (t: string) => t === 'sentado' ? 'Fila y número específico' : t === 'mixto' ? 'Zonas GA + numeradas' : 'Sin asiento asignado';
+        const seatDesc = (t: string) => t === 'sentado' ? 'Fila y número específico' : t === 'mixto' ? 'Zonas GA + numeradas' : 'Admisión general';
         const filtered = allVenues.filter(v => {
           if (venueFilter.city && v.city !== venueFilter.city) return false;
           if (venueFilter.type && getVenueSeatType(v) !== venueFilter.type) return false;
@@ -1452,8 +1452,8 @@ export default function EventsPage() {
               </select>
               <select value={venueFilter.type} onChange={e => setVenueFilter(f => ({...f, type: e.target.value}))} className="px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#EF4444]">
                 <option value="">Todos los tipos</option>
-                <option value="parado">Parado (GA)</option>
-                <option value="sentado">Sentado (Numerado)</option>
+                <option value="parado">General (GA)</option>
+                <option value="sentado">Numerado</option>
                 <option value="mixto">Mixto</option>
               </select>
             </div>
@@ -1522,7 +1522,7 @@ export default function EventsPage() {
                               <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline">📍 Ver en Maps</a>
                             </div>
                             {/* SVG Layout Map — cached to prevent flickering */}
-                            {v.layout_svg_url && (
+                            {v.layout_svg_url ? (
                               <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 overflow-hidden">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Mapa del Recinto</p>
                                 <CachedSvgImage
@@ -1530,6 +1530,10 @@ export default function EventsPage() {
                                   alt={`Mapa ${v.name}`}
                                   className="w-full max-h-48 object-contain rounded"
                                 />
+                              </div>
+                            ) : (
+                              <div className="mt-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-center">
+                                <p className="text-[10px] text-gray-400">Sin mapa de recinto configurado</p>
                               </div>
                             )}
                             {/* Events in this venue */}
@@ -1557,10 +1561,10 @@ export default function EventsPage() {
                                           <span className="ml-1.5">{getEventTypeBadge(ev.event_type)}</span>
                                         </td>
                                         <td className="py-1.5 px-2 text-center">{zTypes.length > 0 ? zTypes.map((t, i) => {
-                                          const lbl = (t === 'reserved' || t === 'numbered') ? 'Sentado' : t === 'ga' ? 'Parado' : 'Mixto';
+                                          const lbl = (t === 'reserved' || t === 'numbered') ? 'Numerado' : t === 'ga' ? 'General' : 'Mixto';
                                           const cls = (t === 'reserved' || t === 'numbered') ? 'badge-reserved' : t === 'ga' ? 'badge-ga' : 'badge-hybrid';
                                           return <span key={i} className={`badge ${cls} mr-0.5`}>{lbl}</span>;
-                                        }) : <span className="badge badge-ga">Parado</span>}</td>
+                                        }) : <span className="badge badge-ga">General</span>}</td>
                                         <td className="py-1.5 px-2 text-center text-gray-500 hidden sm:table-cell">{ev.start_date ? new Date(ev.start_date).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
                                         <td className="py-1.5 px-2 text-center"><span className={`badge ${ev.status === 'active' ? 'badge-success' : ev.status === 'draft' ? 'badge-warning' : 'badge-info'}`}>{ev.status === 'active' ? 'Activo' : ev.status || '—'}</span></td>
                                       </tr>
