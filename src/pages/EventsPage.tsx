@@ -166,11 +166,13 @@ const formatCurrency = (amount: number) =>
 const formatDate = (dateStr: string) => {
   if (!dateStr) return 'TBD';
   try {
-    return new Date(dateStr).toLocaleDateString('es-MX', {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'TBD';
+    return d.toLocaleDateString('es-MX', {
       day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   } catch {
-    return dateStr || 'TBD';
+    return 'TBD';
   }
 };
 
