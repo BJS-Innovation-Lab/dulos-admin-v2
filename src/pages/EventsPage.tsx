@@ -836,23 +836,23 @@ export default function EventsPage() {
 
   return (
     <div className="bg-[#f8f6f6] py-4">
-      <div className="mx-auto max-w-[1200px] px-3 sm:px-4">
+      <div className="mx-auto max-w-[1200px] px-0 sm:px-4">
         {/* Header */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-lg sm:text-xl font-bold text-gray-900">EVENTOS</h1>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="mb-3 sm:mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-base sm:text-xl font-bold text-gray-900">EVENTOS</h1>
+          <div className="flex gap-2 items-center">
             <input
               type="text"
-              placeholder="Buscar proyectos..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 sm:px-4 py-2 text-sm focus:border-[#EF4444] focus:outline-none focus:ring-1 focus:ring-[#EF4444]"
+              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-xs sm:text-sm focus:border-[#EF4444] focus:outline-none focus:ring-1 focus:ring-[#EF4444]"
             />
             <button
               onClick={() => { setEditingProject(null); setEditingProjectId(null); setModalOpen(true); }}
-              className="rounded-lg bg-[#EF4444] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#c5303c]"
+              className="rounded-lg bg-[#EF4444] px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white transition-colors hover:bg-[#c5303c] whitespace-nowrap flex-shrink-0"
             >
-              + Nuevo Proyecto
+              + Nuevo
             </button>
           </div>
         </div>

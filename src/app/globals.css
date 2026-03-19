@@ -118,6 +118,33 @@
   display: none;
 }
 
+/* Responsive table — horizontal scroll on mobile */
+.table-responsive {
+  @apply overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0;
+}
+
+/* Mobile-compact data-table cells */
+@media (max-width: 639px) {
+  .data-table thead th {
+    @apply px-2 py-2 text-[10px];
+  }
+  .data-table tbody td {
+    @apply px-2 py-2 text-xs;
+  }
+  .metric-card {
+    @apply p-2;
+  }
+  .metric-card-value {
+    @apply text-lg;
+  }
+  .section-card-header {
+    @apply px-3 py-3;
+  }
+  .section-card-body {
+    @apply p-3;
+  }
+}
+
 /* Smooth transitions */
 * {
   @apply transition-colors duration-150;

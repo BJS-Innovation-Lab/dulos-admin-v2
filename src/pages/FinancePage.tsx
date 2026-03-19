@@ -702,19 +702,31 @@ export default function FinancePage() {
   return (
     <div className="space-y-4">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h1 className="text-lg sm:text-xl font-extrabold text-gray-900">Panel Financiero</h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Metricas de ingresos, capacidad y tendencias</p>
+      <div className="flex flex-col gap-3">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-lg sm:text-xl font-extrabold text-gray-900">Panel Financiero</h1>
+            <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">Metricas de ingresos, capacidad y tendencias</p>
+          </div>
+          <button
+            onClick={exportCSV}
+            className="px-3 py-2 bg-[#EF4444] text-white rounded-lg text-xs font-medium hover:bg-[#c5303c] transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span className="hidden sm:inline">Exportar CSV</span>
+            <span className="sm:hidden">CSV</span>
+          </button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Date range presets — pending until "Aplicar" */}
-          <div className="flex rounded-lg overflow-hidden border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          {/* Date range presets */}
+          <div className="flex rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
             {dateRangeOptions.map(opt => (
               <button
                 key={opt.key}
                 onClick={() => setPendingDateRange(opt.key)}
-                className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-colors ${
                   pendingDateRange === opt.key
                     ? 'bg-[#1E293B] text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -725,11 +737,11 @@ export default function FinancePage() {
             ))}
           </div>
 
-          {/* Event dropdown — pending until "Aplicar" */}
+          {/* Event dropdown */}
           <select
             value={pendingEvent}
             onChange={e => setPendingEvent(e.target.value)}
-            className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]"
           >
             <option value="">Todos los Eventos</option>
             {events.map(event => (
@@ -737,38 +749,28 @@ export default function FinancePage() {
             ))}
           </select>
 
-          {/* Aplicar / Limpiar buttons */}
-          <button
-            onClick={applyFilters}
-            disabled={!hasFilterChanges}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors ${
-              hasFilterChanges
-                ? 'bg-[#EF4444] text-white hover:bg-[#c5303c]'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Aplicar Filtros
-          </button>
-          {filtersApplied && (
+          {/* Aplicar / Limpiar */}
+          <div className="flex gap-2 flex-shrink-0">
             <button
-              onClick={clearFilters}
-              className="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              onClick={applyFilters}
+              disabled={!hasFilterChanges}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                hasFilterChanges
+                  ? 'bg-[#EF4444] text-white hover:bg-[#c5303c]'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
             >
-              Limpiar
+              Aplicar
             </button>
-          )}
-
-          {/* Export */}
-          <button
-            onClick={exportCSV}
-            className="px-3 sm:px-4 py-2 bg-[#EF4444] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#c5303c] transition-colors flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span className="hidden sm:inline">Exportar CSV</span>
-            <span className="sm:hidden">CSV</span>
-          </button>
+            {filtersApplied && (
+              <button
+                onClick={clearFilters}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1078,22 +1080,22 @@ export default function FinancePage() {
           </div>
 
           {/* Quick stats row */}
-          <div className="grid grid-cols-4 gap-3">
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
               <p className="text-[10px] text-gray-500 uppercase">Mejor día</p>
-              <p className="text-sm font-extrabold">{summaryStats.bestDay}</p>
+              <p className="text-xs sm:text-sm font-extrabold">{summaryStats.bestDay}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
               <p className="text-[10px] text-gray-500 uppercase">Ticket promedio</p>
-              <p className="text-sm font-extrabold">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
+              <p className="text-xs sm:text-sm font-extrabold">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
               <p className="text-[10px] text-gray-500 uppercase">Top evento</p>
-              <p className="text-sm font-extrabold truncate">{summaryStats.popularEvent}</p>
+              <p className="text-xs sm:text-sm font-extrabold truncate">{summaryStats.popularEvent}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
               <p className="text-[10px] text-gray-500 uppercase">Top zona</p>
-              <p className="text-sm font-extrabold">{summaryStats.popularZone}</p>
+              <p className="text-xs sm:text-sm font-extrabold">{summaryStats.popularZone}</p>
             </div>
           </div>
         </div>
@@ -1189,18 +1191,18 @@ export default function FinancePage() {
       {activeTab === 'comisiones' && (
         <div className="space-y-4 animate-fade-in">
           {/* Summary row — compact */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
-              <p className="text-[10px] text-gray-500 uppercase">Ingresos brutos</p>
-              <p className="text-lg font-extrabold">{fmtCurrency(commissionData.totalRevenue)}</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Ingresos brutos</p>
+              <p className="text-sm sm:text-lg font-extrabold">{fmtCurrency(commissionData.totalRevenue)}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
-              <p className="text-[10px] text-gray-500 uppercase">Comisión Dulos (15%)</p>
-              <p className="text-lg font-extrabold text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Comisión (15%)</p>
+              <p className="text-sm sm:text-lg font-extrabold text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
-              <p className="text-[10px] text-gray-500 uppercase">Para Productor (85%)</p>
-              <p className="text-lg font-extrabold text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Productor (85%)</p>
+              <p className="text-sm sm:text-lg font-extrabold text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
             </div>
           </div>
 

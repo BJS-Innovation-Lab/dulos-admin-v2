@@ -27,8 +27,8 @@ export default function AdminNav({ activeTab, onTabChange, permissions }: AdminN
 
   return (
     <nav className="bg-white">
-      <div className="max-w-[1400px] mx-auto px-8">
-        <div className="flex gap-8 overflow-x-auto scrollbar-hide justify-center py-1">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-8">
+        <div className="flex gap-4 sm:gap-8 overflow-x-auto scrollbar-hide justify-start sm:justify-center py-1">
           {visibleTabs.map(tab => (
             <button
               key={tab.id}

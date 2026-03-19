@@ -12,11 +12,11 @@ export default function AdminHeader({ user, onLogout }: AdminHeaderProps) {
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-[1200px] mx-auto px-6 h-20 flex items-center justify-center relative">
-        <Image src="/dulos-logo.svg" alt="Dulos" width={160} height={50} className="h-10 w-auto" priority />
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 h-14 sm:h-20 flex items-center justify-center relative">
+        <Image src="/dulos-logo.svg" alt="Dulos" width={160} height={50} className="h-7 sm:h-10 w-auto" priority />
 
-        <div className="absolute right-6 flex items-center gap-3">
-          <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-medium text-gray-400 bg-gray-100 rounded border border-gray-200" title="Búsqueda global (próximamente)">
+        <div className="absolute right-3 sm:right-6 flex items-center gap-2 sm:gap-3">
+          <span className="hidden sm:inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-medium text-gray-400 bg-gray-100 rounded border border-gray-200" title="Búsqueda global (próximamente)">
             &#x2318;K
           </span>
           <button onClick={() => alert("Notificaciones (próximamente)")} className="relative p-2 text-gray-500 hover:text-gray-900 transition">
