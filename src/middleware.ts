@@ -12,7 +12,9 @@ const PUBLIC_PATHS = [
   "/dulos-logo.svg",
 ];
 
-const ALLOWED_EMAILS = ["angel.lopez@vulkn-ai.com", "tamaravulkn@gmail.com"];
+// Hardcoded founders always have access + team_members from DB
+const FOUNDER_EMAILS = ["angel.lopez@vulkn-ai.com", "tamaravulkn@gmail.com", "paolo@dulos.io"];
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU5MzkzNCwiZXhwIjoyMDg5MTY5OTM0fQ.-1ABMJP5sYUyW1MDg2W7T8ZE3ipe5x_Lvmec9UdZkO8';
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -66,11 +68,25 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.redirect(url));
   }
 
-  if (!ALLOWED_EMAILS.includes(user.email.toLowerCase())) {
-    // Valid session but not authorized - redirect with error
-    const url = new URL("/login", request.url);
-    url.searchParams.set("error", "unauthorized");
-    return addSecurityHeaders(NextResponse.redirect(url));
+  const emailLower = user.email.toLowerCase();
+  if (!FOUNDER_EMAILS.includes(emailLower)) {
+    // Check if user is in team_members (dynamic access)
+    try {
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://udjwabtyhjcrpyuffavz.supabase.co';
+      const res = await fetch(`${sbUrl}/rest/v1/team_members?email=eq.${encodeURIComponent(emailLower)}&is_active=eq.true&select=id&limit=1`, {
+        headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` },
+      });
+      const members = await res.json();
+      if (!Array.isArray(members) || members.length === 0) {
+        const url = new URL("/login", request.url);
+        url.searchParams.set("error", "unauthorized");
+        return addSecurityHeaders(NextResponse.redirect(url));
+      }
+    } catch {
+      const url = new URL("/login", request.url);
+      url.searchParams.set("error", "unauthorized");
+      return addSecurityHeaders(NextResponse.redirect(url));
+    }
   }
 
   // User is authenticated and authorized

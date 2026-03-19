@@ -893,11 +893,11 @@ export default function OpsPage() {
                 {blogPosts.map(bp => (
                   <tr key={bp.id}>
                     <td className="font-bold max-w-[250px]">{bp.title}</td>
-                    <td><span className={`badge ${bp.status === 'published' ? 'badge-success' : bp.status === 'draft' ? 'badge-warning' : 'badge-info'}`}>{bp.status === 'published' ? 'Publicado' : bp.status === 'draft' ? 'Borrador' : bp.status}</span></td>
+                    <td><span className={`badge ${(bp as any).published ? 'badge-success' : 'badge-warning'}`}>{(bp as any).published ? 'Publicado' : 'Borrador'}</span></td>
                     <td className="hidden sm:table-cell text-gray-400">{bp.published_at ? new Date(bp.published_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
                     <td>
-                      {bp.slug && bp.status === 'published' ? (
-                        <a href={`/blog/${bp.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-[10px] font-medium">🔗 Ver</a>
+                      {bp.slug ? (
+                        <a href={`https://dulos.io/blog/${bp.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-[10px] font-medium">🔗 Ver</a>
                       ) : (
                         <span className="text-gray-300 text-[10px]">—</span>
                       )}

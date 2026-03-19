@@ -848,9 +848,10 @@ export default function AdminPage() {
             <h3 className="font-extrabold text-sm sm:text-base mb-3">Invitar usuario</h3>
             <input id="invite-email" type="email" placeholder="Email" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]" />
             <select id="invite-role" className="w-full border rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]">
-              <option value="ADMIN">Administrador</option>
-              <option value="MANAGER">Gerente</option>
-              <option value="TAQUILLERO">Taquillero</option>
+              <option value="super_admin">Administrador</option>
+              <option value="operator">Operador</option>
+              <option value="analyst">Analista</option>
+              <option value="taquillero">Taquillero</option>
             </select>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowInvite(false)} className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700">Cancelar</button>
@@ -858,7 +859,7 @@ export default function AdminPage() {
                 const emailInput = document.querySelector<HTMLInputElement>('#invite-email');
                 const roleSelect = document.querySelector<HTMLSelectElement>('#invite-role');
                 if (emailInput && roleSelect) {
-                  const result = await inviteUser({ email: emailInput.value, role: roleSelect.value as 'ADMIN' | 'MANAGER' | 'TAQUILLERO' });
+                  const result = await inviteUser({ email: emailInput.value, role: roleSelect.value as 'super_admin' | 'operator' | 'analyst' | 'taquillero' });
                   if (result.success) {
                     toast.success('Invitación enviada');
                     setShowInvite(false);
