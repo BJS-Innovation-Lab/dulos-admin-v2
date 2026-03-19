@@ -107,29 +107,24 @@ export async function inviteUser(formData: UserInviteFormData) {
       }
     }
 
-    // Fallback: Supabase Auth invite
+    // Fallback: webhook to external email service (no more ugly Supabase Auth emails)
     if (!emailSent) {
       try {
-        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_SERVICE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: parsed.data.email,
-            data: { role: parsed.data.role, display_name: name },
-          }),
-        });
-        if (inviteRes.ok) {
-          emailSent = true;
-          emailMethod = 'supabase';
-        } else {
-          console.warn('Auth invite email failed:', await inviteRes.text());
+        // Call external webhook for beautiful email delivery
+        const webhookUrl = process.env.INVITE_WEBHOOK_URL;
+        if (webhookUrl) {
+          const webhookRes = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: parsed.data.email, name, role: parsed.data.role }),
+          });
+          if (webhookRes.ok) {
+            emailSent = true;
+            emailMethod = 'webhook';
+          }
         }
       } catch (e) {
-        console.warn('Auth invite error:', e);
+        console.warn('Webhook email error:', e);
       }
     }
 

@@ -87,29 +87,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fallback: Supabase Auth invite
+    // Fallback: webhook for beautiful email delivery
     if (!emailSent) {
       try {
-        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_SERVICE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email,
-            data: { role, display_name: displayName },
-          }),
-        });
-        if (inviteRes.ok) {
-          emailSent = true;
-          emailMethod = 'supabase';
-        } else {
-          console.warn('Supabase invite failed:', await inviteRes.text());
+        const webhookUrl = process.env.INVITE_WEBHOOK_URL;
+        if (webhookUrl) {
+          const webhookRes = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name: displayName, role }),
+          });
+          if (webhookRes.ok) {
+            emailSent = true;
+            emailMethod = 'webhook';
+          }
         }
       } catch (e) {
-        console.warn('Supabase invite error:', e);
+        console.warn('Webhook email error:', e);
       }
     }
 
