@@ -212,7 +212,8 @@ function SkeletonRow() {
   );
 }
 
-/* ─── Project Modal ─── */
+/* ─── Project Modal (Paolo's Modular Design) ─── */
+/* Step 1: Select Venue → Step 2: Event Details + Type → Step 3: Zones → Create */
 
 function ProjectModal({
   open,
@@ -220,13 +221,16 @@ function ProjectModal({
   onSubmit,
   initialData,
   submitting,
+  venues,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: ProjectFormData) => void;
   initialData?: ProjectFormData | null;
   submitting?: boolean;
+  venues?: Venue[];
 }) {
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState<ProjectFormData>({
     nombre: '',
     productor: '',
@@ -234,13 +238,25 @@ function ProjectModal({
     descripcion: '',
     estado: 'Borrador',
   });
+  const [venueId, setVenueId] = useState('');
+  const [eventType, setEventType] = useState<'single' | 'recurring' | 'multiday'>('single');
+  const [zones, setZones] = useState<{ name: string; type: 'ga' | 'reserved'; price: number; capacity: number }[]>([
+    { name: '', type: 'ga', price: 0, capacity: 0 }
+  ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const selectedVenue = (venues || []).find(v => v.id === venueId);
 
   useEffect(() => {
     if (initialData) {
       setForm(initialData);
+      setStep(2); // Skip venue selection when editing
     } else {
       setForm({ nombre: '', productor: '', imagen_url: '', descripcion: '', estado: 'Borrador' });
+      setStep(1);
+      setVenueId('');
+      setEventType('single');
+      setZones([{ name: '', type: 'ga', price: 0, capacity: 0 }]);
     }
     setErrors({});
   }, [initialData, open]);
@@ -262,95 +278,202 @@ function ProjectModal({
     onSubmit(result.data);
   };
 
+  const addZone = () => setZones([...zones, { name: '', type: 'ga', price: 0, capacity: 0 }]);
+  const removeZone = (i: number) => zones.length > 1 && setZones(zones.filter((_, idx) => idx !== i));
+  const updateZone = (i: number, field: string, val: string | number) => {
+    const updated = [...zones];
+    (updated[i] as any)[field] = val;
+    setZones(updated);
+  };
+
+  const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444]";
+  const errCls = "w-full rounded-lg border border-red-400 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444]";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 max-w-lg w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-5">
-          <h3 className="font-bold text-base sm:text-lg text-gray-900">
-            {initialData ? 'Editar Proyecto' : 'Nuevo Proyecto'}
-          </h3>
+      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        {/* Header with steps */}
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="font-bold text-base sm:text-lg text-gray-900">
+              {initialData ? 'Editar Evento' : 'Nuevo Evento'}
+            </h3>
+            {!initialData && (
+              <div className="flex items-center gap-1 mt-1">
+                {[1, 2, 3].map(s => (
+                  <span key={s} className={`w-6 h-1 rounded-full ${s <= step ? 'bg-[#EF4444]' : 'bg-gray-200'}`} />
+                ))}
+                <span className="text-[10px] text-gray-400 ml-2">
+                  {step === 1 ? 'Recinto' : step === 2 ? 'Evento' : 'Zonas'}
+                </span>
+              </div>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nombre */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del proyecto</label>
-            <input
-              type="text"
-              value={form.nombre}
-              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444] ${errors.nombre ? 'border-red-400' : 'border-gray-300'}`}
-            />
-            {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
-          </div>
-
-          {/* Productor */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Productor</label>
-            <input
-              type="text"
-              value={form.productor}
-              onChange={(e) => setForm({ ...form, productor: e.target.value })}
-              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444] ${errors.productor ? 'border-red-400' : 'border-gray-300'}`}
-            />
-            {errors.productor && <p className="text-xs text-red-500 mt-1">{errors.productor}</p>}
-          </div>
-
-          {/* Imagen URL */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Imagen URL</label>
-            <input
-              type="text"
-              value={form.imagen_url}
-              onChange={(e) => setForm({ ...form, imagen_url: e.target.value })}
-              placeholder="https://..."
-              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444] ${errors.imagen_url ? 'border-red-400' : 'border-gray-300'}`}
-            />
-            {errors.imagen_url && <p className="text-xs text-red-500 mt-1">{errors.imagen_url}</p>}
-          </div>
-
-          {/* Descripcion */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion</label>
-            <textarea
-              value={form.descripcion}
-              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444]"
-            />
-          </div>
-
-          {/* Estado */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+        {/* STEP 1: Venue Selection */}
+        {step === 1 && !initialData && (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">El evento hereda dirección, timezone y mapa del recinto.</p>
             <select
-              value={form.estado}
-              onChange={(e) => setForm({ ...form, estado: e.target.value as 'Borrador' | 'Publicado' })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444]"
+              value={venueId}
+              onChange={e => setVenueId(e.target.value)}
+              className={inputCls}
             >
-              <option value="Borrador">Borrador</option>
-              <option value="Publicado">Publicado</option>
+              <option value="">Seleccionar recinto...</option>
+              {(venues || []).map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.name} — {v.city}, {v.state} · Cap. {v.capacity?.toLocaleString()}
+                </option>
+              ))}
             </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-[#EF4444] px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#c5303c] disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {submitting && (
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+            {selectedVenue && (
+              <div className="rounded-lg border border-gray-200 p-3 bg-gray-50 text-xs space-y-1">
+                <p className="font-bold">{selectedVenue.name}</p>
+                <p className="text-gray-500">{[selectedVenue.city, selectedVenue.state, selectedVenue.country].filter(Boolean).join(', ')}</p>
+                <p className="text-gray-500">Capacidad: {selectedVenue.capacity?.toLocaleString()} · Timezone: {selectedVenue.timezone?.replace('America/', '')}</p>
+                {selectedVenue.has_seatmap && <span className="badge badge-reserved">Asientos Numerados</span>}
+                {selectedVenue.layout_svg_url && (
+                  <img src={selectedVenue.layout_svg_url} alt="Mapa" className="w-full max-h-32 object-contain rounded mt-2" />
+                )}
+              </div>
             )}
-            {initialData ? 'Guardar Cambios' : 'Crear Proyecto'}
-          </button>
-        </form>
+            <button
+              type="button"
+              disabled={!venueId}
+              onClick={() => setStep(2)}
+              className="w-full rounded-lg bg-[#EF4444] px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#c5303c] disabled:opacity-30"
+            >
+              Siguiente →
+            </button>
+          </div>
+        )}
+
+        {/* STEP 2: Event Details */}
+        {step === 2 && (
+          <form onSubmit={initialData ? handleSubmit : (e) => { e.preventDefault(); setStep(3); }} className="space-y-3">
+            {selectedVenue && !initialData && (
+              <div className="flex items-center gap-2 text-[10px] text-gray-400 mb-1">
+                <span>📍 {selectedVenue.name}</span>
+                <button type="button" onClick={() => setStep(1)} className="text-blue-500 hover:underline">cambiar</button>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del evento</label>
+              <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} className={errors.nombre ? errCls : inputCls} />
+              {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
+            </div>
+            {!initialData && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de evento</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { key: 'single' as const, label: 'Único', desc: 'Una función' },
+                    { key: 'recurring' as const, label: 'Recurrente', desc: 'Múltiples funciones' },
+                    { key: 'multiday' as const, label: 'Multiday', desc: 'Festival / varios días' },
+                  ]).map(t => (
+                    <button
+                      key={t.key} type="button"
+                      onClick={() => setEventType(t.key)}
+                      className={`rounded-lg border p-2 text-center transition-colors ${eventType === t.key ? 'border-[#EF4444] bg-red-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                      <p className="text-xs font-bold">{t.label}</p>
+                      <p className="text-[9px] text-gray-400">{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Productor</label>
+              <input type="text" value={form.productor} onChange={e => setForm({ ...form, productor: e.target.value })} className={errors.productor ? errCls : inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Imagen URL</label>
+              <input type="text" value={form.imagen_url} onChange={e => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://..." className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+              <textarea value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value as 'Borrador' | 'Publicado' })} className={inputCls}>
+                <option value="Borrador">Borrador</option>
+                <option value="Publicado">Publicado</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              {!initialData && <button type="button" onClick={() => setStep(1)} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">← Atrás</button>}
+              <button type="submit" disabled={submitting} className="flex-1 rounded-lg bg-[#EF4444] px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#c5303c] disabled:opacity-50 flex items-center justify-center gap-2">
+                {submitting && <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                {initialData ? 'Guardar Cambios' : 'Siguiente → Zonas'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 3: Zones Configuration */}
+        {step === 3 && !initialData && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <span>📍 {selectedVenue?.name}</span>
+              <span>·</span>
+              <span>{eventType === 'single' ? 'Único' : eventType === 'recurring' ? 'Recurrente' : 'Multiday'}</span>
+            </div>
+            <p className="text-xs text-gray-500">Define las zonas de venta. Cada zona tiene su tipo, precio y capacidad.</p>
+            {zones.map((z, i) => (
+              <div key={i} className="rounded-lg border border-gray-200 p-3 space-y-2 relative">
+                {zones.length > 1 && (
+                  <button type="button" onClick={() => removeZone(i)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm">&times;</button>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-0.5 block">Nombre</label>
+                    <input type="text" value={z.name} onChange={e => updateZone(i, 'name', e.target.value)} placeholder="Ej: VIP, General, Platea..." className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-0.5 block">Tipo de asiento</label>
+                    <select value={z.type} onChange={e => updateZone(i, 'type', e.target.value)} className={inputCls}>
+                      <option value="ga">Parado (GA)</option>
+                      <option value="reserved">Sentado (Numerado)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-0.5 block">Precio (MXN)</label>
+                    <input type="number" value={z.price || ''} onChange={e => updateZone(i, 'price', Number(e.target.value))} placeholder="0" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-0.5 block">Capacidad</label>
+                    <input type="number" value={z.capacity || ''} onChange={e => updateZone(i, 'capacity', Number(e.target.value))} placeholder="0" className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={addZone} className="w-full rounded-lg border border-dashed border-gray-300 py-2 text-xs text-gray-400 hover:border-[#EF4444] hover:text-[#EF4444]">
+              + Agregar zona
+            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setStep(2)} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">← Atrás</button>
+              <button
+                type="button"
+                disabled={submitting || !form.nombre || zones.some(z => !z.name)}
+                onClick={() => {
+                  const result = projectSchema.safeParse(form);
+                  if (!result.success) { setStep(2); return; }
+                  onSubmit(result.data);
+                }}
+                className="flex-1 rounded-lg bg-[#EF4444] px-4 py-2.5 font-medium text-white transition-colors hover:bg-[#c5303c] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {submitting && <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                Crear Evento
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -574,14 +697,18 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
               </div>
             )}
 
-            {allZones.length > 0 && (
+            {allZones.length > 0 && (() => {
+              // Only show Tipo column when zones have MIXED types
+              const uniqueTypes = [...new Set(allZones.map(z => z.tipo).filter(Boolean))];
+              const showTipoCol = uniqueTypes.length > 1;
+              return (
               <div className="section-card">
                 <div className="overflow-x-auto">
                   <table className="data-table">
                     <thead>
                       <tr>
                         <th>Zona</th>
-                        <th className="hidden sm:table-cell">Tipo</th>
+                        {showTipoCol && <th className="hidden sm:table-cell">Tipo</th>}
                         <th className="text-right">Cap.</th>
                         <th className="text-right">Vend.</th>
                         <th className="text-right hidden sm:table-cell">Disp.</th>
@@ -599,7 +726,7 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                         return (
                           <tr key={z.id}>
                             <td className="font-medium">{z.nombre}</td>
-                            <td className="hidden sm:table-cell">{getZoneTypeBadge(z.tipo)}</td>
+                            {showTipoCol && <td className="hidden sm:table-cell">{getZoneTypeBadge(z.tipo)}</td>}
                             <td className="text-right">{cap.toLocaleString()}</td>
                             <td className="text-right">{vend.toLocaleString()}</td>
                             <td className="text-right hidden sm:table-cell">{avail.toLocaleString()}</td>
@@ -620,7 +747,7 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                         return (
                           <tr className="total-row">
                             <td className="font-bold">Total</td>
-                            <td className="hidden sm:table-cell"></td>
+                            {showTipoCol && <td className="hidden sm:table-cell"></td>}
                             <td className="text-right">{totalCap}</td>
                             <td className="text-right">{totalVend}</td>
                             <td className="text-right hidden sm:table-cell">{totalAvail}</td>
@@ -633,7 +760,8 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                   </table>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Schedules for single/multiday (recurring already shown above zones) */}
             {allSchedules.length > 0 && project.event_type !== 'recurring' && (
@@ -1212,6 +1340,7 @@ export default function EventsPage() {
           onSubmit={editingProjectId ? handleEditSubmit : handleCreateSubmit}
           initialData={editingProject}
           submitting={submitting}
+          venues={allVenues}
         />
 
         <ConfirmDialog
