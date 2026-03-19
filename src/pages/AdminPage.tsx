@@ -648,7 +648,19 @@ export default function AdminPage() {
 
       {/* ====== COMUNICACIONES (Notifications + Reminders + Surveys) ====== */}
       <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
-        <h2 className="font-extrabold text-sm sm:text-base mb-3">Comunicaciones</h2>
+        <h2 className="font-extrabold text-sm sm:text-base mb-2">Comunicaciones</h2>
+        {/* Pipeline Status */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {[
+            { label: 'Notificaciones', count: notifications.length, icon: '📩' },
+            { label: 'Recordatorios', count: reminders.length, icon: '⏰' },
+            { label: 'Encuestas', count: surveys.length, icon: '📋' },
+          ].map(p => (
+            <span key={p.label} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${p.count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+              {p.icon} {p.label}: {p.count > 0 ? `${p.count} activos` : 'Pipeline listo · 0 registros'}
+            </span>
+          ))}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Notifications */}
           <div className="border border-gray-100 rounded-lg p-3">
