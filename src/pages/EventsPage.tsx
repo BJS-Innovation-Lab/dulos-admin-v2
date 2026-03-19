@@ -652,9 +652,11 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
   const totalCapacity = project.events.reduce((s, e) => s + e.totalTickets, 0);
   const occupancy = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
 
-  // Use real occupancy from v_event_dashboard if available, fallback to manual zones
+  // Use ticket_zones data (projectZones) as primary — v_event_dashboard often has zeros
   const projectZones = project.events.flatMap((e) => e.zones);
-  const allZones: ZoneDisplay[] = eventDashZones.length > 0
+  // Check if dashboard data actually has useful values (not all zeros)
+  const dashHasData = eventDashZones.some(d => (d.zone_price || 0) > 0 || (d.zone_sold || 0) > 0 || (d.zone_available || 0) > 0);
+  const allZones: ZoneDisplay[] = dashHasData
     ? eventDashZones.map((d, idx) => ({
         id: `dash-${eventId}-${idx}`,
         nombre: d.zone_name,
@@ -695,7 +697,9 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
               })()}
             </div>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">{venue}</p>
-            <p className="text-xs sm:text-sm text-gray-500">{formatDate(dateRange)}</p>
+            {dateRange && formatDate(dateRange) !== 'TBD' && (
+              <p className="text-xs sm:text-sm text-gray-500">{formatDate(dateRange)}</p>
+            )}
           </div>
 
           <div className="lg:w-[60%] space-y-3 sm:space-y-4">
