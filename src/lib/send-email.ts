@@ -1,33 +1,45 @@
 /**
- * Send emails via Gmail API using Google Service Account
- * Uses domain-wide delegation to impersonate vulkimi.testeo@vulkn-ai.com
+ * Send emails via Gmail API — ZERO external dependencies
+ * Uses manual JWT signing + fetch (no googleapis package needed)
+ * Works on Vercel serverless without size issues
  */
 
-import { google } from 'googleapis';
 import { inviteEmailHTML } from './email-templates';
+import * as crypto from 'crypto';
 
 const IMPERSONATE_EMAIL = 'vulkimi.testeo@vulkn-ai.com';
+const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-// Service account credentials for email sending
-// Same pattern as SUPABASE_SERVICE_ROLE_KEY (hardcoded fallback in private repo)
-function getCredentials() {
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON) {
-    return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON);
-  }
-  return {
-    type: 'service_account',
-    project_id: 'hq-vulkn',
-    private_key_id: 'ae61bdf497bd13176b48ab8bc1801d2b754793c3',
-    private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCjC+UnFlYNjtvJ\n0odwGjxOKP0gKxA+NrgShtDmAJDf4R8BVidcKBA5MqnBHJcOVF4dDrjECccRYGza\n7l0u5bV2z9+OXU5j53esirNwzj9jUCoMnvfLiLsQ29iZ0Edsnj7HPQhNFQ8q55m2\n86sKQtTCVfYLsZb96687WdR3AD77LWUAzT2hCBpj2wTmzIzt8CDrhtisvfk2xdJC\ndpkUdIHLXEzYc80gC5MEEsptE3PSrJq00dmkn6iSrcTmlNpzAzbc1Grz0NZBDIgL\n5gKSHiY1t/I/VbbeODOZnCsNjf9CvoFxkHJO9dvV3OnKyQarwwVHxZc7cqf3QZKh\nwd8wfwKPAgMBAAECggEAN/OrDcDSgxCVSCshI009iKz0QIfGqTLp9CGjqmpjTRDa\nLQE9vJhbCOXj70s6Y0Z8jYgxy8R3NfVbJb5K5/8YSM+JLjfC4PHb1bA7Z+i/Q/uM\nkowzCPvBBkYLjK029YVQkdrV8G3bqKOV0nzII1tP2+jX6Kdm43hvx/RJvxSsiFE9\nbRE8Q7GS3+M7qhFclWEON/5wczNLnAAeDde/CoIc5sv7hkumFXxjSyDV+LxevPkj\nmTk0lqLvJ9dFceDGqDP/oDxv28o9jCwukjlUIAfA65eWZgJo1MQIHKf8/Pb1vFWm\nGVMAE6gdFxfhyDmoQ3v8VvdQtE2ORh9FYAiaEY9oUQKBgQDPdh2D+py+fkGvx45G\nGqEr4+hcslaEpJ5+OdbmjuBDJ2CbTQmTCRY2DaZ5Va+q1JBojfVyQz4YUwdK+9ju\nAod5YzC39X1Zr4Vl8gtgYGtl6fkW+ASETCt0lF5MkLr299GR3Xk8TbELUlPOVPp6\nr4Pay49KWlXKdk77P8XISAzHpQKBgQDJMY0hBLd1SWcGhSdMdn8zwpA0hVK6uE/f\nkKDTWNTWboTxsfGiAIdlZDKds+ZgATr9yWA98tv0P9mvMsMciDhyXle6o+CBNT0o\nuJ98AClZeIUTz3JbiQwqwzhXUSM6VvPrg952g/ENFFwW7bhSa7RjbyAy1vqkUes+\nZk96nqsrIwKBgQCJqFhBYKNtCx3O410WS0kydFGUYIlkDk9UdlCQP7GzHYfOxLlb\npSXly/zwedjMQ6tmlPuOS+wB++XU7XOtymPWOejzx6LbRcoAMTE3TAM3Zp7vjLaC\nioAzJNfFeit1AE9AuHJffzXAy2nseRqTGa8mGPgFYBeY9hPGRzSXhqdkOQKBgCL1\nDBtvkVy8mz0Dx7c+Y42fwaSOgbhVq/MhUwBFz/1OCKViEKTgSKYySaUjC+UkcZaE\n9cbtuo/uxCjvvfzoIj6k68NPFAP/NxgrM/K8qHKWQTEW+zyyTD3l25U4UNGjKBCE\nwhN/i1OFdRa6ySrw8c/REBwlRDlmzmPyLN8WUJFXAoGBAJSbgi4GwrFuidyzDmw6\nUorBUDW+OlShosy/PMOJfTIo/x7tMycKmfUKamCrhQUkv6avQQQV0Pjjj48XEkNW\n5ISD2ydtgQ+4n2LYkUhlMq+jSitEU1Rp9P+3FyRDlU2+pash+vAHKdpDUhurYpPG\nWh3OlzfCeYIUiBg7uoGEJIba\n-----END PRIVATE KEY-----\n',
-    client_email: 'vulkn-agents@hq-vulkn.iam.gserviceaccount.com',
-    client_id: '112686295089031758606',
-    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-    token_uri: 'https://oauth2.googleapis.com/token',
-    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-    client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/vulkn-agents%40hq-vulkn.iam.gserviceaccount.com',
-    universe_domain: 'googleapis.com',
-  };
-}
+const SA_EMAIL = 'vulkn-agents@hq-vulkn.iam.gserviceaccount.com';
+const SA_PRIVATE_KEY = process.env.GOOGLE_SA_PRIVATE_KEY || `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCjC+UnFlYNjtvJ
+0odwGjxOKP0gKxA+NrgShtDmAJDf4R8BVidcKBA5MqnBHJcOVF4dDrjECccRYGza
+7l0u5bV2z9+OXU5j53esirNwzj9jUCoMnvfLiLsQ29iZ0Edsnj7HPQhNFQ8q55m2
+86sKQtTCVfYLsZb96687WdR3AD77LWUAzT2hCBpj2wTmzIzt8CDrhtisvfk2xdJC
+dpkUdIHLXEzYc80gC5MEEsptE3PSrJq00dmkn6iSrcTmlNpzAzbc1Grz0NZBDIgL
+5gKSHiY1t/I/VbbeODOZnCsNjf9CvoFxkHJO9dvV3OnKyQarwwVHxZc7cqf3QZKh
+wd8wfwKPAgMBAAECggEAN/OrDcDSgxCVSCshI009iKz0QIfGqTLp9CGjqmpjTRDa
+LQE9vJhbCOXj70s6Y0Z8jYgxy8R3NfVbJb5K5/8YSM+JLjfC4PHb1bA7Z+i/Q/uM
+kowzCPvBBkYLjK029YVQkdrV8G3bqKOV0nzII1tP2+jX6Kdm43hvx/RJvxSsiFE9
+bRE8Q7GS3+M7qhFclWEON/5wczNLnAAeDde/CoIc5sv7hkumFXxjSyDV+LxevPkj
+mTk0lqLvJ9dFceDGqDP/oDxv28o9jCwukjlUIAfA65eWZgJo1MQIHKf8/Pb1vFWm
+GVMAE6gdFxfhyDmoQ3v8VvdQtE2ORh9FYAiaEY9oUQKBgQDPdh2D+py+fkGvx45G
+GqEr4+hcslaEpJ5+OdbmjuBDJ2CbTQmTCRY2DaZ5Va+q1JBojfVyQz4YUwdK+9ju
+Aod5YzC39X1Zr4Vl8gtgYGtl6fkW+ASETCt0lF5MkLr299GR3Xk8TbELUlPOVPp6
+r4Pay49KWlXKdk77P8XISAzHpQKBgQDJMY0hBLd1SWcGhSdMdn8zwpA0hVK6uE/f
+kKDTWNTWboTxsfGiAIdlZDKds+ZgATr9yWA98tv0P9mvMsMciDhyXle6o+CBNT0o
+uJ98AClZeIUTz3JbiQwqwzhXUSM6VvPrg952g/ENFFwW7bhSa7RjbyAy1vqkUes+
+Zk96nqsrIwKBgQCJqFhBYKNtCx3O410WS0kydFGUYIlkDk9UdlCQP7GzHYfOxLlb
+pSXly/zwedjMQ6tmlPuOS+wB++XU7XOtymPWOejzx6LbRcoAMTE3TAM3Zp7vjLaC
+ioAzJNfFeit1AE9AuHJffzXAy2nseRqTGa8mGPgFYBeY9hPGRzSXhqdkOQKBgCL1
+DBtvkVy8mz0Dx7c+Y42fwaSOgbhVq/MhUwBFz/1OCKViEKTgSKYySaUjC+UkcZaE
+9cbtuo/uxCjvvfzoIj6k68NPFAP/NxgrM/K8qHKWQTEW+zyyTD3l25U4UNGjKBCE
+whN/i1OFdRa6ySrw8c/REBwlRDlmzmPyLN8WUJFXAoGBAJSbgi4GwrFuidyzDmw6
+UorBUDW+OlShosy/PMOJfTIo/x7tMycKmfUKamCrhQUkv6avQQQV0Pjjj48XEkNW
+5ISD2ydtgQ+4n2LYkUhlMq+jSitEU1Rp9P+3FyRDlU2+pash+vAHKdpDUhurYpPG
+Wh3OlzfCeYIUiBg7uoGEJIba
+-----END PRIVATE KEY-----`;
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Administrador',
@@ -36,14 +48,45 @@ const ROLE_LABELS: Record<string, string> = {
   taquillero: 'Taquillero',
 };
 
-async function getGmailClient() {
-  const credentials = getCredentials();
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/gmail.send'],
-    clientOptions: { subject: IMPERSONATE_EMAIL },
+function base64url(data: Buffer | string): string {
+  const buf = typeof data === 'string' ? Buffer.from(data) : data;
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function getAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64url(JSON.stringify({
+    iss: SA_EMAIL,
+    sub: IMPERSONATE_EMAIL,
+    scope: 'https://www.googleapis.com/auth/gmail.send',
+    aud: TOKEN_URL,
+    iat: now,
+    exp: now + 3600,
+  }));
+
+  const signInput = `${header}.${payload}`;
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(signInput);
+  const signature = base64url(sign.sign(SA_PRIVATE_KEY));
+  const jwt = `${signInput}.${signature}`;
+
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
   });
-  return google.gmail({ version: 'v1', auth });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Token exchange failed: ${res.status} ${err}`);
+  }
+
+  const data = await res.json();
+  return data.access_token;
 }
 
 export async function sendInviteEmail({
@@ -56,7 +99,7 @@ export async function sendInviteEmail({
   role: string;
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const gmail = await getGmailClient();
+    const accessToken = await getAccessToken();
     const displayRole = ROLE_LABELS[role] || role;
     const html = inviteEmailHTML({
       name,
@@ -88,18 +131,24 @@ export async function sendInviteEmail({
       `--${boundary}--`,
     ].join('\r\n');
 
-    const encodedMessage = Buffer.from(mimeMessage)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+    const encodedMessage = base64url(mimeMessage);
 
-    const result = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw: encodedMessage },
+    const res = await fetch(GMAIL_SEND_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw: encodedMessage }),
     });
 
-    return { success: true, messageId: result.data.id || undefined };
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Gmail send failed: ${res.status} ${err}`);
+    }
+
+    const data = await res.json();
+    return { success: true, messageId: data.id };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('sendInviteEmail error:', msg);

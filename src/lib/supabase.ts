@@ -549,7 +549,7 @@ export async function fetchRecentOrders(limit = 50): Promise<Order[]> {
 
 export async function fetchRecentTickets(limit = 50): Promise<Ticket[]> {
   try {
-    return await supabaseFetch<Ticket[]>(`tickets?select=id,ticket_number,event_id,zone_name,customer_name,customer_email,status,price,created_at,checked_in_at&order=created_at.desc&limit=${limit}`);
+    return await supabaseFetch<Ticket[]>(`tickets?select=id,ticket_number,event_id,zone_name,customer_name,customer_email,status,created_at,checked_in_at&order=created_at.desc&limit=${limit}`);
   } catch (error) {
     console.error('Error fetching recent tickets:', error);
     return [];
