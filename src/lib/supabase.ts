@@ -325,8 +325,12 @@ export interface VenueSeat {
   id: string;
   venue_id: string;
   section: string;
-  row: string;
+  row_label: string;
   seat_number: string;
+  seat_type: string;
+  sort_order: number;
+  x: number;
+  y: number;
   created_at: string;
 }
 

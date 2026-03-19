@@ -10,6 +10,8 @@ import {
   fetchSchedules,
   fetchEventDashboard,
   fetchScheduleInventory,
+  fetchVenueSeats,
+  fetchEventSectionSeatsForEvent,
   getVenueMap,
   getVenueName,
   getVenueCity,
@@ -18,6 +20,8 @@ import {
   Order,
   Schedule,
   ScheduleInventory,
+  VenueSeat,
+  EventSectionSeat,
   Venue,
   EventDashboard,
 } from '../lib/supabase';
@@ -43,6 +47,7 @@ interface EventDisplay {
   id: string;
   name: string;
   venue: string;
+  venueId: string;
   date: string;
   image_url: string;
   ticketsSold: number;
@@ -429,14 +434,28 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
   const eventDashZones = dashboardData.filter(d => d.event_id === eventId);
   const [schedInv, setSchedInv] = useState<ScheduleInventory[]>([]);
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
+  const [venueSeats, setVenueSeats] = useState<VenueSeat[]>([]);
+  const [sectionSeats, setSectionSeats] = useState<(EventSectionSeat & { section_name?: string })[]>([]);
+  const [showSeatMap, setShowSeatMap] = useState(false);
 
-  // Fetch schedule inventory on mount
+  const isReserved = project.event_type === 'reserved' || project.event_type === 'hybrid';
+
+  // Fetch schedule inventory + seat data on mount
   useEffect(() => {
     if (!eventId) return;
     const scheduleIds = project.events.flatMap(e => e.schedules.map(s => s.id));
     Promise.all(scheduleIds.map(sid => fetchScheduleInventory(sid)))
       .then(results => setSchedInv(results.flat()))
       .catch(() => {});
+
+    // Seat map data for reserved/hybrid events
+    if (isReserved) {
+      const venueId = project.events[0]?.venueId;
+      if (venueId) {
+        fetchVenueSeats(venueId).then(setVenueSeats).catch(() => {});
+      }
+      fetchEventSectionSeatsForEvent(eventId).then(setSectionSeats).catch(() => {});
+    }
   }, [eventId]);
 
   const totalRevenue = project.events.reduce((s, e) => s + e.revenue, 0);
@@ -610,6 +629,88 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                 </div>
               </div>
             )}
+            {/* Seat Map for reserved/hybrid events */}
+            {isReserved && venueSeats.length > 0 && (
+              <div className="section-card">
+                <div
+                  className="section-card-header cursor-pointer"
+                  onClick={() => setShowSeatMap(!showSeatMap)}
+                >
+                  <h4 className="section-card-title">
+                    <span className="text-gray-400 mr-1 text-[10px]">{showSeatMap ? '▼' : '▶'}</span>
+                    Mapa de Asientos
+                  </h4>
+                  <span className="ml-auto text-xs text-gray-400">{venueSeats.length} asientos</span>
+                </div>
+                {showSeatMap && (() => {
+                  // Build seat status map from event_section_seats
+                  const seatStatusMap = new Map<string, string>();
+                  sectionSeats.forEach(ss => {
+                    if (ss.venue_seat_id) seatStatusMap.set(ss.venue_seat_id, ss.status || 'available');
+                  });
+
+                  // Group by section
+                  const sectionMap = new Map<string, VenueSeat[]>();
+                  venueSeats.forEach(s => {
+                    const sec = s.section || 'General';
+                    if (!sectionMap.has(sec)) sectionMap.set(sec, []);
+                    sectionMap.get(sec)!.push(s);
+                  });
+
+                  const statusColor = (status: string) =>
+                    status === 'sold' ? 'bg-[#EF4444]' :
+                    status === 'reserved' ? 'bg-yellow-400' :
+                    'bg-emerald-400';
+
+                  const statusCounts = { available: 0, reserved: 0, sold: 0 };
+                  venueSeats.forEach(s => {
+                    const st = seatStatusMap.get(s.id) || 'available';
+                    if (st in statusCounts) statusCounts[st as keyof typeof statusCounts]++;
+                  });
+
+                  return (
+                    <div className="p-3">
+                      {/* Legend */}
+                      <div className="flex items-center gap-3 mb-3 text-[10px]">
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-400 inline-block"></span> Disponible ({statusCounts.available})</span>
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-400 inline-block"></span> Reservado ({statusCounts.reserved})</span>
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-[#EF4444] inline-block"></span> Vendido ({statusCounts.sold})</span>
+                      </div>
+                      {/* Sections */}
+                      {Array.from(sectionMap.entries()).map(([secName, seats]) => (
+                        <div key={secName} className="mb-3">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">{secName}</p>
+                          {/* Group by row */}
+                          {(() => {
+                            const rowMap = new Map<string, VenueSeat[]>();
+                            seats.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).forEach(s => {
+                              const row = s.row_label || '—';
+                              if (!rowMap.has(row)) rowMap.set(row, []);
+                              rowMap.get(row)!.push(s);
+                            });
+                            return Array.from(rowMap.entries()).map(([rowLabel, rowSeats]) => (
+                              <div key={rowLabel} className="flex items-center gap-0.5 mb-0.5">
+                                <span className="text-[9px] font-bold text-gray-400 w-4 text-right mr-1">{rowLabel}</span>
+                                {rowSeats.map(s => {
+                                  const status = seatStatusMap.get(s.id) || 'available';
+                                  return (
+                                    <span
+                                      key={s.id}
+                                      title={`${rowLabel}${s.seat_number} — ${status}`}
+                                      className={`w-3 h-3 rounded-sm ${statusColor(status)} cursor-default transition-transform hover:scale-150`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -688,6 +789,7 @@ export default function EventsPage() {
               id: event.id,
               name: event.name,
               venue: getVenueName(event.venue_id, venues) + (getVenueCity(event.venue_id, venues) ? `, ${getVenueCity(event.venue_id, venues)}` : ''),
+              venueId: event.venue_id,
               date: event.start_date ? formatDate(event.start_date) : 'TBD',
               image_url: event.image_url || '',
               ticketsSold, totalTickets, revenue,
