@@ -1,18 +1,17 @@
 /**
- * Send emails via Gmail API — ZERO external dependencies
- * Uses manual JWT signing + fetch (no googleapis package needed)
- * Works on Vercel serverless without size issues
+ * Send emails via Gmail API — ZERO external dependencies, ZERO Node.js imports
+ * Uses Web Crypto API (works everywhere: Node, Edge, Vercel, browser)
+ * No webpack bundling issues — safe to import from server actions
  */
 
 import { inviteEmailHTML } from './email-templates';
-import * as crypto from 'crypto';
 
 const IMPERSONATE_EMAIL = 'vulkimi.testeo@vulkn-ai.com';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-
 const SA_EMAIL = 'vulkn-agents@hq-vulkn.iam.gserviceaccount.com';
-const SA_PRIVATE_KEY = process.env.GOOGLE_SA_PRIVATE_KEY || `-----BEGIN PRIVATE KEY-----
+
+const SA_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCjC+UnFlYNjtvJ
 0odwGjxOKP0gKxA+NrgShtDmAJDf4R8BVidcKBA5MqnBHJcOVF4dDrjECccRYGza
 7l0u5bV2z9+OXU5j53esirNwzj9jUCoMnvfLiLsQ29iZ0Edsnj7HPQhNFQ8q55m2
@@ -48,15 +47,36 @@ const ROLE_LABELS: Record<string, string> = {
   taquillero: 'Taquillero',
 };
 
-function base64url(data: Buffer | string): string {
-  const buf = typeof data === 'string' ? Buffer.from(data) : data;
-  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// ---- Web Crypto helpers (no Node.js crypto import) ----
+
+function arrayBufferToBase64url(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function getAccessToken(): Promise<string> {
+function strToBase64url(str: string): string {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const b64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  const binary = atob(b64);
+  const buf = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+  return buf;
+}
+
+async function signJWT(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const payload = base64url(JSON.stringify({
+
+  const header = strToBase64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = strToBase64url(JSON.stringify({
     iss: SA_EMAIL,
     sub: IMPERSONATE_EMAIL,
     scope: 'https://www.googleapis.com/auth/gmail.send',
@@ -66,10 +86,28 @@ async function getAccessToken(): Promise<string> {
   }));
 
   const signInput = `${header}.${payload}`;
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(signInput);
-  const signature = base64url(sign.sign(SA_PRIVATE_KEY));
-  const jwt = `${signInput}.${signature}`;
+
+  const keyData = pemToArrayBuffer(SA_PRIVATE_KEY_PEM);
+  const cryptoKey = await globalThis.crypto.subtle.importKey(
+    'pkcs8',
+    keyData,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signatureBuffer = await globalThis.crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(signInput)
+  );
+
+  const signature = arrayBufferToBase64url(signatureBuffer);
+  return `${signInput}.${signature}`;
+}
+
+async function getAccessToken(): Promise<string> {
+  const jwt = await signJWT();
 
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -88,6 +126,8 @@ async function getAccessToken(): Promise<string> {
   const data = await res.json();
   return data.access_token;
 }
+
+// ---- Public API ----
 
 export async function sendInviteEmail({
   to,
@@ -113,7 +153,7 @@ export async function sendInviteEmail({
     const mimeMessage = [
       `From: "Dulos Entertainment" <${IMPERSONATE_EMAIL}>`,
       `To: ${name} <${to}>`,
-      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
       'MIME-Version: 1.0',
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       '',
@@ -126,12 +166,15 @@ export async function sendInviteEmail({
       'Content-Type: text/html; charset=UTF-8',
       'Content-Transfer-Encoding: base64',
       '',
-      Buffer.from(html).toString('base64').replace(/(.{76})/g, '$1\n'),
+      btoa(unescape(encodeURIComponent(html))).replace(/(.{76})/g, '$1\n'),
       '',
       `--${boundary}--`,
     ].join('\r\n');
 
-    const encodedMessage = base64url(mimeMessage);
+    const encodedMessage = btoa(unescape(encodeURIComponent(mimeMessage)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
 
     const res = await fetch(GMAIL_SEND_URL, {
       method: 'POST',

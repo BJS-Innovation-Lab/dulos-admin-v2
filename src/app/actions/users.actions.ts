@@ -69,26 +69,25 @@ export async function inviteUser(formData: UserInviteFormData) {
     }
     const data = await res.json();
 
-    // Step 2: Send beautiful invite email via internal API route
+    // Step 2: Send beautiful invite email directly via Gmail API
     let emailSent = false;
     let emailMethod = 'none';
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'https://dulos-admin-v2.vercel.app';
-      const emailRes = await fetch(`${baseUrl}/api/invite/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: parsed.data.email, name, role: parsed.data.role }),
+      const { sendInviteEmail } = await import('@/lib/send-email');
+      const emailResult = await sendInviteEmail({
+        to: parsed.data.email,
+        name,
+        role: parsed.data.role,
       });
-      if (emailRes.ok) {
-        const result = await emailRes.json();
-        emailSent = result.emailSent || false;
-        emailMethod = result.emailMethod || 'api';
+      if (emailResult.success) {
+        emailSent = true;
+        emailMethod = 'gmail';
+      } else {
+        console.warn('Email send failed:', emailResult.error);
       }
     } catch (e) {
-      console.warn('Email API error:', e);
+      console.warn('Email error:', e);
     }
 
     logAction('invite', 'user', data[0]?.id || '', JSON.stringify({ email: parsed.data.email, role: parsed.data.role, emailSent, emailMethod }));
